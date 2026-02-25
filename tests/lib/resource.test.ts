@@ -985,4 +985,59 @@ describe('when getting resource', () => {
         expect(spyDeserialize).nthCalledWith(2, { state: 'state2' });
         expect(mockHandler).toBeCalledTimes(1);
     });
+
+    test('castTypeConfigurationRequest returns null when no type config reference or data', async () => {
+        // Covers resource.ts:530 — when typeConfigurationTypeReference is absent AND
+        // requestData has no typeConfiguration the method must return null (not throw).
+        const resource = new Resource(TYPE_NAME, MockModel); // no typeConfigurationTypeReference
+        const mockHandler: jest.Mock = jest.fn(() => ProgressEvent.success());
+        resource.addHandler(Action.Create, mockHandler);
+        // Remove typeConfiguration from the payload so the legacy-code guard is not triggered
+        const payload = JSON.parse(JSON.stringify(entrypointPayload));
+        delete payload.requestData.typeConfiguration;
+        const event = await resource.entrypoint(payload, lambdaContext);
+        expect(event.status).toBe(OperationStatus.Success);
+        // typeConfiguration = null (from line 530) → coerced to undefined by ?? operator
+        expect(mockHandler).toBeCalledWith(
+            expect.anything(),
+            expect.anything(),
+            expect.anything(),
+            expect.anything(),
+            undefined
+        );
+    });
+
+    test('testEntrypoint catches error with no stack and adds one', async () => {
+        // Covers resource.ts:441 — Error.captureStackTrace when err.stack is falsy.
+        const resource = getResource();
+        const errNoStack = new Error('error without stack');
+        delete (errNoStack as any).stack; // make stack undefined so !err.stack is true
+        const mockParseRequest = jest.spyOn<any, any>(resource, 'parseTestRequest');
+        mockParseRequest.mockImplementationOnce(() => {
+            throw errNoStack;
+        });
+        const event = await resource.testEntrypoint({}, undefined);
+        expect(event.status).toBe(OperationStatus.Failed);
+        expect(event.errorCode).toBe(HandlerErrorCode.InternalFailure);
+    });
+
+    test('entrypoint catches error with no stack and adds one', async () => {
+        // Covers resource.ts:642 — Error.captureStackTrace in entrypoint catch when err.stack is falsy.
+        const resource = new Resource(
+            TYPE_NAME,
+            MockModel,
+            null,
+            undefined,
+            MockTypeConfigurationModel
+        );
+        resource.addHandler(Action.Create, jest.fn(async () => ProgressEvent.success()));
+        const errNoStack = new Error('no stack in entrypoint');
+        delete (errNoStack as any).stack;
+        jest.spyOn<any, any>(resource, 'invokeHandler').mockImplementationOnce(() => {
+            throw errNoStack;
+        });
+        const event = await resource.entrypoint(entrypointPayload, lambdaContext);
+        expect(event.status).toBe(OperationStatus.Failed);
+        expect(event.errorCode).toBe(HandlerErrorCode.InternalFailure);
+    });
 });
