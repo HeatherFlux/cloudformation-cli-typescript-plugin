@@ -762,7 +762,9 @@ describe('when delivering logs', () => {
             mockPutLogEvents.mockResolvedValueOnce({
                 rejectedLogEventsInfo: { tooOldLogEventEndIndex: 0 },
             });
-            await expect(cloudWatchLogger.publishLogEvent('test msg')).rejects.toThrow();
+            await expect(
+                cloudWatchLogger.publishLogEvent('test msg')
+            ).rejects.toThrow();
         });
 
         test('populateSequenceToken swallows describeLogStreams error', async () => {
