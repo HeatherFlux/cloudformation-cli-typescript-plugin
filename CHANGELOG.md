@@ -25,6 +25,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - [Support Library] `MetricsPublisher.publishExceptionMetric/publishInvocationMetric/publishDurationMetric/publishLogDeliveryExceptionMetric` return `Promise<void>` instead of `Promise<any>`.
 - [Support Library] `ProgressEvent.progress()` and `ProgressEvent.success()` model/ctx params typed as `BaseModel|null` and `Dict|null` instead of `any`.
 - [Support Library] ESLint `no-unused-vars` rule configured with `argsIgnorePattern`/`varsIgnorePattern: '^_'` to recognize the underscore-prefix convention for intentionally unused parameters.
+- [Support Library] `Logger.log` interface and all internal `log()` implementations (`LoggerProxy`, `CloudWatchLogPublisher`, `S3LogHelper`, `MetricsPublisher`, `BaseResource`) now use `unknown` instead of `any` for message/params — more precise types that still accept all values.
+- [Support Library] `Queue<void>` explicit type annotation on `CloudWatchLogPublisher.queue` eliminates the implicit `unknown` return type mismatch with `Promise<void>`.
+- [Support Library] ESLint `no-explicit-any` disabled for `tests/**/*.ts` — test files legitimately use `jest.spyOn<any,any>` for private method spying and `null as any` for error-path testing; blanket disable is cleaner than 86 per-line suppressions.
 
 ---
 

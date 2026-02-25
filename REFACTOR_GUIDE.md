@@ -35,8 +35,11 @@ TS-01 (strictNullChecks: true enabled; all 244 tests pass)
 PY-03 (_validate_build_prerequisites() added to _build(); validates npm, node>=20, sam; 7 new tests)
 DEP-04 (EVALUATED: only one version of @org-formation/tombok exists; part of public API; no action needed)
 
-### ⏳ Deferred
-PY-04 (SUPPORT_LIB_VERSION sync: interim test in place; dynamic reading still deferred)
+### ✅ Completed (this branch, continued)
+PY-04 (SUPPORT_LIB_VERSION: read dynamically from `python/rpdk/typescript/data/support-lib-version.txt`; CI sync-test validates the file)
+LOG-TYPES (Logger.log / private log methods: `any` → `unknown` throughout log-delivery.ts, metrics.ts, resource.ts; Queue<void> explicit type)
+
+### 🔬 Investigated — Do NOT Implement
 INC-04 — ❌ DO NOT implement — reflect-metadata removal is unsafe
 
 ---
