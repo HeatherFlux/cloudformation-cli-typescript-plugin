@@ -23,8 +23,37 @@ EXECUTABLE = "cfn"
 SUPPORT_LIB_NAME = (
     "@amazon-web-services-cloudformation/cloudformation-cli-typescript-lib"
 )
-SUPPORT_LIB_VERSION = "^2.0.0"
 MAIN_HANDLER_FUNCTION = "TypeFunction"
+
+
+def _load_support_lib_version() -> str:
+    """Read the support-library version from the packaged data file.
+
+    ``data/support-lib-version.txt`` contains only the bare semver string
+    (e.g. ``2.0.0``).  This function wraps it in a ``^`` range specifier
+    suitable for ``package.json`` dependency declarations.
+
+    Using a data file instead of a hardcoded constant means a single
+    ``echo 'X.Y.Z' > python/rpdk/typescript/data/support-lib-version.txt``
+    in the release script keeps the Python plugin and the npm library in sync
+    without any source-code edits.
+
+    Returns a fallback of ``"^2.0.0"`` if the file cannot be read so that
+    tests that don't need the version don't fail unexpectedly.
+    """
+    try:
+        data_dir = os.path.join(os.path.dirname(__file__), "data")
+        version_file = os.path.join(data_dir, "support-lib-version.txt")
+        with open(version_file, "r", encoding="utf-8") as fh:
+            return f"^{fh.read().strip()}"
+    except OSError:
+        LOG.warning(
+            "Could not read support-lib-version.txt; falling back to '^2.0.0'."
+        )
+        return "^2.0.0"
+
+
+SUPPORT_LIB_VERSION = _load_support_lib_version()
 
 
 def validate_no(value):

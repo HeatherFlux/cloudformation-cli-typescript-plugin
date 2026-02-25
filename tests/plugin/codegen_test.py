@@ -325,7 +325,12 @@ def test_init_settings_removes_legacy_use_docker_key():
 
 
 def test_support_lib_version_matches_package_json():
-    """Ensure SUPPORT_LIB_VERSION in codegen.py stays in sync with package.json."""
+    """Ensure support-lib-version.txt and SUPPORT_LIB_VERSION match package.json.
+
+    SUPPORT_LIB_VERSION is now read dynamically from
+    ``python/rpdk/typescript/data/support-lib-version.txt``.  Updating that
+    file is all that is needed when bumping the npm package version.
+    """
     import json
     from pathlib import Path
     from rpdk.typescript.codegen import SUPPORT_LIB_VERSION
@@ -333,10 +338,23 @@ def test_support_lib_version_matches_package_json():
     repo_root = Path(__file__).parent.parent.parent
     pkg = json.loads((repo_root / "package.json").read_text())
     expected = f"^{pkg['version']}"
+
+    # Check the data file directly (it's the source of truth).
+    version_file = (
+        repo_root / "python" / "rpdk" / "typescript" / "data" / "support-lib-version.txt"
+    )
+    file_version = f"^{version_file.read_text().strip()}"
+    assert file_version == expected, (
+        f"support-lib-version.txt ({file_version!r}) does not match "
+        f"package.json version ({pkg['version']!r}). "
+        "Run: echo 'X.Y.Z' > python/rpdk/typescript/data/support-lib-version.txt"
+    )
+
+    # Check the runtime constant (derived from the data file).
     assert SUPPORT_LIB_VERSION == expected, (
         f"SUPPORT_LIB_VERSION ({SUPPORT_LIB_VERSION!r}) does not match "
         f"package.json version ({pkg['version']!r}). "
-        "Update python/rpdk/typescript/codegen.py when bumping the npm version."
+        "The constant should be read from support-lib-version.txt automatically."
     )
 
 
