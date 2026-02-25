@@ -1,4 +1,4 @@
-import { deepFreeze, ProgressTracker, replaceAll } from '~/utils';
+import { deepFreeze, ProgressTracker, Queue, replaceAll } from '~/utils';
 
 describe('when getting utils', () => {
     afterEach(() => {
@@ -262,6 +262,31 @@ describe('when getting utils', () => {
             deepFreeze(proto);
             expect(Object.isFrozen(proto)).toBe(true);
             expect(Object.isFrozen(Object.getPrototypeOf(proto))).toBe(false);
+        });
+    });
+
+    describe('Queue', () => {
+        test('enqueue resolves when callback returns a resolved promise', async () => {
+            const queue = new Queue<string>();
+            const result = await queue.enqueue(() => Promise.resolve('hello'));
+            expect(result).toBe('hello');
+        });
+
+        test('enqueue rejects when callback throws synchronously', async () => {
+            const queue = new Queue<string>();
+            const syncError = new Error('sync throw');
+            await expect(
+                queue.enqueue(() => {
+                    throw syncError;
+                })
+            ).rejects.toThrow('sync throw');
+        });
+
+        test('enqueue rejects when callback returns a rejected promise', async () => {
+            const queue = new Queue<string>();
+            await expect(
+                queue.enqueue(() => Promise.reject(new Error('async reject')))
+            ).rejects.toThrow('async reject');
         });
     });
 

@@ -178,6 +178,20 @@ describe('when recasting objects', () => {
         expect(result).toBe(circular);
     });
 
+    test('transformValue with existing Map instance passes it directly', () => {
+        // Covers the `value instanceof Map` true branch in recast.ts (line 62).
+        // Use null values so the recursive call returns early and avoids
+        // the "unsupported type" throw for unrecognised inner types.
+        const existingMap = new Map<string, null>([
+            ['x', null],
+            ['y', null],
+        ]);
+        const result = transformValue(Map, 'key', existingMap, {}) as Map<string, null>;
+        expect(result).toBeInstanceOf(Map);
+        expect(result.get('x')).toBeNull();
+        expect(result.get('y')).toBeNull();
+    });
+
     test('deepFreeze handles circular references without stack overflow', () => {
         // deepFreeze uses a processed Set to guard against circular refs
         const obj: any = { a: 1 };

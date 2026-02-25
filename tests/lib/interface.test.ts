@@ -6,6 +6,7 @@ import {
     UnmodeledRequest,
 } from '~/interface';
 import { SerializableModel } from '../data/sample-model';
+import type { Dict } from '~/interface';
 
 describe('when getting interface', () => {
     test('base resource model get type name', () => {
@@ -100,6 +101,41 @@ describe('when getting interface', () => {
         expect((dto as unknown as Record<string, unknown>)['dynamicProp']).toBe(
             'hello'
         );
+    });
+
+    test('toModeled without deserialize leaves resource states undefined', () => {
+        // Covers the `?.` optional-chain false branch at interface.ts:314-317.
+        // BaseModel inherits a static deserialize from BaseDto; use a plain
+        // constructor function that has no deserialize property so the optional
+        // chain short-circuits to undefined.
+        const unmodeled = UnmodeledRequest.fromUnmodeled({
+            awsAccountId: '123456789012',
+            region: 'us-east-1',
+        });
+        // Plain function has no static deserialize → optional chain returns undefined
+        function PlainRef() {}
+        const request = unmodeled.toModeled(PlainRef as unknown as typeof BaseModel);
+        expect(request).toBeInstanceOf(BaseResourceHandlerRequest);
+        expect(request.desiredResourceState).toBeUndefined();
+        expect(request.previousResourceState).toBeUndefined();
+    });
+
+    test('toModeled with deserialize populates resource states', () => {
+        // Covers the `??` non-null branch at interface.ts:314-317:
+        // when deserialize returns a model (not null/undefined) the ?? passes it through.
+        const unmodeled = UnmodeledRequest.fromUnmodeled({
+            awsAccountId: '123456789012',
+            region: 'us-east-1',
+            desiredResourceState: { somekey: 'val' },
+        });
+        const ModelRef: typeof SerializableModel & {
+            deserialize: (data: Dict | null | undefined) => SerializableModel | null;
+        } = SerializableModel as typeof SerializableModel & {
+            deserialize: (data: Dict | null | undefined) => SerializableModel | null;
+        };
+        const request = unmodeled.toModeled(ModelRef);
+        expect(request).toBeInstanceOf(BaseResourceHandlerRequest);
+        expect(request.desiredResourceState).not.toBeNull();
     });
 
     test('unmodeled request partion', () => {

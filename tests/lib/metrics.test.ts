@@ -247,6 +247,17 @@ describe('when getting metrics', () => {
         expect(spyPublishLog).toHaveReturnedWith(Promise.resolve(null));
     });
 
+    test('publishLogDeliveryExceptionMetric catches rethrowing error from publishMetric', async () => {
+        // publishMetric re-throws ThrottlingException; the outer catch in
+        // publishLogDeliveryExceptionMetric (line 195) must swallow it.
+        const spyLogger = jest.spyOn(publisher['logger'], 'log');
+        mockSend.mockRejectedValueOnce(
+            Object.assign(new Error('Rate exceeded'), { name: 'ThrottlingException' })
+        );
+        await publisher.publishLogDeliveryExceptionMetric(MOCK_DATE, new TypeError('test'));
+        expect(spyLogger).toHaveBeenCalledWith(expect.any(Error));
+    });
+
     test('metrics publisher without refreshing client throws', async () => {
         expect.assertions(1);
         const metricsPublisher = new MetricsPublisher(session, console, RESOURCE_TYPE);
