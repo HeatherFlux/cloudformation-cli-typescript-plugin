@@ -6,3 +6,4 @@ export * from './proxy';
 export * from './resource';
 export * from './recast';
 export * from './utils';
+export * as codegen from './codegen';

@@ -1,9 +1,12 @@
 {
     "name": "@amazon-web-services-cloudformation/cloudformation-cli-typescript-lib",
-    "version": "1.0.6",
+    "version": "2.0.0",
     "description": "The CloudFormation Resource Provider Development Kit (RPDK) allows you to author your own resource providers that can be used by CloudFormation. This plugin library helps to provide runtime bindings for the execution of your providers by CloudFormation.",
     "private": false,
     "main": "dist/index.js",
+    "bin": {
+        "cfn-ts": "dist/bin/cfn-ts.js"
+    },
     "directories": {
         "test": "tests"
     },
@@ -23,7 +26,7 @@
     },
     "engines": {
         "node": ">=20.0.0",
-        "npm": ">=6.9.0"
+        "npm": ">=10.0.0"
     },
     "repository": {
         "type": "git",
@@ -36,12 +39,15 @@
     },
     "homepage": "https://github.com/aws-cloudformation/cloudformation-cli-typescript-plugin#readme",
     "dependencies": {
+        "@aws-sdk/client-cloudwatch": "^3.730.0",
+        "@aws-sdk/client-cloudwatch-logs": "^3.943.0",
+        "@aws-sdk/client-s3": "^3.943.0",
         "@org-formation/tombok": "^0.0.1",
+        "@smithy/types": "^4.12.0",
         "autobind-decorator": "^2.4.0",
         "class-transformer": "^0.5.1",
         "reflect-metadata": "^0.2.2",
-        "string.prototype.replaceall": "^1.0.3",
-        "uuid": "^7.0.2"
+        "uuid": "^9.0.0"
     },
     "devDependencies": {
         "@tsconfig/node20": "^20.1.0",
@@ -50,7 +56,6 @@
         "@types/uuid": "^9.0.0",
         "@typescript-eslint/eslint-plugin": "^6.0.0",
         "@typescript-eslint/parser": "^6.0.0",
-        "aws-sdk": "~2.814.0",
         "eslint": "~8.21.0",
         "eslint-config-prettier": "^9.1.0",
         "eslint-import-resolver-node": "^0.3.3",
@@ -63,16 +68,7 @@
         "prettier": "^3.1.0",
         "ts-jest": "^29.1.2",
         "ts-node": "^10.9.2",
-        "typescript": "~5.3.0",
-        "worker-pool-aws-sdk": "^0.1.0"
-    },
-    "peerDependencies": {
-        "aws-sdk": "^2.712.0"
-    },
-    "peerDependenciesMeta": {
-        "aws-sdk": {
-            "optional": true
-        }
+        "typescript": "~5.7.0"
     },
     "prettier": {
         "parser": "typescript",

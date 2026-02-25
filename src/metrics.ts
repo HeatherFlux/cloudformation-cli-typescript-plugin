@@ -196,7 +196,7 @@ export class MetricsPublisher {
         }
     }
 
-    private log(message?: any, ...optionalParams: any[]): void {
+    private log(message?: unknown, ...optionalParams: unknown[]): void {
         if (this.logger) {
             this.logger.log(message, ...optionalParams);
         }

@@ -6,4 +6,5 @@ target/
 node_modules/
 coverage/
 python/
+env/
 .eslintrc.js
