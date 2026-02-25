@@ -757,6 +757,26 @@ describe('when delivering logs', () => {
             expect(spySkip).toHaveReturnedWith(true);
         });
 
+        test('putLogEvents with rejectedLogEventsInfo throws', async () => {
+            // Covers log-delivery.ts:230 — putLogEvents throws when response has rejectedLogEventsInfo
+            mockPutLogEvents.mockResolvedValueOnce({
+                rejectedLogEventsInfo: { tooOldLogEventEndIndex: 0 },
+            });
+            await expect(cloudWatchLogger.publishLogEvent('test msg')).rejects.toThrow();
+        });
+
+        test('populateSequenceToken swallows describeLogStreams error', async () => {
+            // Covers log-delivery.ts:252 — platformLogger.log called when describeLogStreams throws
+            const spyPlatformLog = jest.spyOn(console, 'log');
+            mockDescribeLogStreams.mockRejectedValueOnce(new Error('describe failed'));
+            const token = await cloudWatchLogger.populateSequenceToken();
+            expect(token).toBeNull();
+            expect(spyPlatformLog).toHaveBeenCalledWith(
+                'Error from "describeLogStreams"',
+                expect.any(Error)
+            );
+        });
+
         test('put object failure with no metrics publisher swallows metric error', async () => {
             expect.assertions(4);
             const spyEmit = jest.spyOn<any, any>(
@@ -884,6 +904,38 @@ describe('when delivering logs', () => {
             loggerProxy.tracker.end();
             loggerProxy.markPending();
             expect(loggerProxy.tracker.done).toBe(false);
+        });
+
+        test('should log to fallbackLogger when retry also fails', async () => {
+            // Covers log-delivery.ts:719-720 — fallbackLogger.log(retryErr) and tracker.addFailed()
+            // when both the first attempt AND the retry throw.
+            mockPutLogEvents
+                .mockRejectedValueOnce(
+                    sdkError(
+                        'InvalidSequenceTokenException',
+                        'The given sequenceToken is invalid. The next expected sequenceToken is: 49590338271490256608559692538361571095921575989136588898'
+                    )
+                )
+                .mockRejectedValueOnce(new Error('retry also failed'));
+            const fallbackLog = jest.fn();
+            const proxy = new LoggerProxy({}, { log: fallbackLog });
+            proxy.addLogPublisher(cloudWatchLogger);
+            proxy.tracker.restart();
+            proxy.log('test retry failure');
+            await proxy.waitCompletion();
+            expect(fallbackLog).toHaveBeenCalledWith(expect.any(Error));
+        });
+
+        test('should add failed when publishLogEvent throws a non-Error', async () => {
+            // Covers log-delivery.ts:726 — tracker.addFailed() when non-Error is thrown
+            spyPublishLogEvent.mockRejectedValueOnce('string-not-error');
+            const proxy = new LoggerProxy({});
+            proxy.addLogPublisher(cloudWatchLogger);
+            proxy.tracker.restart();
+            proxy.log('msg');
+            await proxy.waitCompletion();
+            // Non-Error caught — tracker records a failure but does not rethrow
+            expect(spyPublishLogEvent).toHaveBeenCalledTimes(1);
         });
 
         test('should route tracker failure to injected fallbackLogger', async () => {
