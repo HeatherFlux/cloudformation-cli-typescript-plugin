@@ -1,4 +1,4 @@
-import { ProgressEvent, SessionProxy } from '~/proxy';
+import { ProgressEvent, ResourceHandlerRequest, SessionProxy } from '~/proxy';
 import { BaseModel, HandlerErrorCode, OperationStatus, Optional } from '~/interface';
 
 /** Minimal stub for an AWS SDK v3 client constructor. */
@@ -180,6 +180,33 @@ describe('when getting session proxy', () => {
                 errorCode: HandlerErrorCode.InvalidRequest,
                 callbackDelaySeconds: 0,
             });
+        });
+
+        test('progress with ctx (truthy) sets callbackContext', () => {
+            const ctx = { key: 'value' };
+            const event = ProgressEvent.progress(undefined, ctx);
+            expect(event.callbackContext).toEqual(ctx);
+            expect(event.status).toBe(OperationStatus.InProgress);
+        });
+
+        test('progress without model omits resourceModel', () => {
+            const event = ProgressEvent.progress();
+            expect(event.resourceModel).toBeUndefined();
+            expect(event.status).toBe(OperationStatus.InProgress);
+        });
+
+        test('success sets status to Success', () => {
+            const model = new ResourceModel({ somekey: 'x' });
+            const event = ProgressEvent.success(model);
+            expect(event.status).toBe(OperationStatus.Success);
+            expect(event.resourceModel).toBe(model);
+        });
+    });
+
+    describe('ResourceHandlerRequest', () => {
+        test('is constructable and instanceof BaseModel request', () => {
+            const req = new ResourceHandlerRequest<ResourceModel>();
+            expect(req).toBeInstanceOf(ResourceHandlerRequest);
         });
     });
 });

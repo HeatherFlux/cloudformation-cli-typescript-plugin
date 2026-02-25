@@ -156,6 +156,21 @@ describe('resolveModels', () => {
         expect(Object.keys(models)).not.toContain('ResourceModel');
     });
 
+    test('bare object type without additionalProperties resolves to opaque object', () => {
+        // Exercises the fallback branch at resolver.ts:131
+        const schema: CfnResourceSchema = {
+            typeName: 'A::B::C',
+            properties: {
+                Config: { type: 'object' }, // no $ref, no oneOf, no additionalProperties
+            },
+        };
+        const models = resolveModels(schema);
+        expect(models.ResourceModel.Config).toEqual({
+            container: 'primitive',
+            type: 'object',
+        });
+    });
+
     test('skips non-object definitions (primitive aliases)', () => {
         const schema: CfnResourceSchema = {
             typeName: 'A::B::C',
@@ -280,6 +295,14 @@ describe('getInnerType', () => {
         expect(inner.type).toBe('Tag');
         expect(inner.classes).toEqual(['Map', 'Array']);
         expect(inner.primitive).toBe(false);
+    });
+
+    test('opaque object type uses Object wrapper (exercises ?? fallback in translate.ts)', () => {
+        // The type 'object' is not in PRIMITIVE_WRAPPERS, so ?? 'Object' is used
+        const inner = getInnerType({ container: 'primitive', type: 'object' });
+        expect(inner.type).toBe('object');
+        expect(inner.wrapperType).toBe('Object');
+        expect(inner.primitive).toBe(true);
     });
 });
 
@@ -470,6 +493,91 @@ describe('generateModels', () => {
         // Using "Delete" as a check via tsPropName directly
         // (our fixture doesn't have reserved words, but verifying schema has no crash)
         expect(source).toBeTruthy();
+    });
+});
+
+// ---------------------------------------------------------------------------
+// generateModels — default parameter branches
+// ---------------------------------------------------------------------------
+
+describe('generateModels (default identifier branches)', () => {
+    test('omitting primaryIdentifier uses empty default and still generates the method', () => {
+        const models = resolveModels({
+            typeName: 'A::B::C',
+            properties: { Name: { type: 'string' } },
+        });
+        // Call WITHOUT primaryIdentifier or additionalIdentifiers to exercise the `= []` defaults
+        const source = generateModels({
+            libName: LIB_NAME,
+            typeName: 'A::B::C',
+            models,
+        });
+        expect(source).toContain('export class ResourceModel extends BaseModel');
+        expect(source).toContain("TYPE_NAME: string = 'A::B::C'");
+        // getPrimaryIdentifier still generated but with empty body
+        expect(source).toContain('getPrimaryIdentifier(): Dict');
+        // getAdditionalIdentifiers still generated but with empty body
+        expect(source).toContain('getAdditionalIdentifiers(): Array<Dict>');
+    });
+
+    test('omitting additionalIdentifiers alone still generates correctly', () => {
+        const models = resolveModels(FULL_SCHEMA);
+        const source = generateModels({
+            libName: LIB_NAME,
+            typeName: FULL_SCHEMA.typeName,
+            models,
+            primaryIdentifier: FULL_SCHEMA.primaryIdentifier,
+            // additionalIdentifiers intentionally omitted — exercises `= []` default
+        });
+        expect(source).toContain('IDENTIFIER_KEY_ID');
+        // No additional identifier methods when none provided
+        expect(source).not.toContain('getIdentifier_Count');
+    });
+});
+
+// ---------------------------------------------------------------------------
+// generateModelsFromSchema — ?? fallback branches
+// ---------------------------------------------------------------------------
+
+describe('generateModelsFromSchema (missing schema fields)', () => {
+    test('schema without primaryIdentifier or additionalIdentifiers', () => {
+        const schema: CfnResourceSchema = {
+            typeName: 'A::B::C',
+            properties: { Name: { type: 'string' } },
+            // no primaryIdentifier, no additionalIdentifiers — exercises the ?? [] fallback
+        };
+        const source = generateModelsFromSchema(schema, LIB_NAME);
+        expect(source).toContain('export class ResourceModel extends BaseModel');
+        expect(source).toContain('getPrimaryIdentifier(): Dict');
+    });
+
+    test('schema with only primaryIdentifier set', () => {
+        const schema: CfnResourceSchema = {
+            typeName: 'X::Y::Z',
+            properties: { Id: { type: 'string' } },
+            primaryIdentifier: ['/properties/Id'],
+            // additionalIdentifiers absent — exercises the ?? [] fallback for that field only
+        };
+        const source = generateModelsFromSchema(schema, LIB_NAME);
+        expect(source).toContain('IDENTIFIER_KEY_ID');
+        expect(source).not.toContain('getIdentifier_');
+    });
+
+    test('merges extraModels into output', () => {
+        const schema: CfnResourceSchema = {
+            typeName: 'A::B::C',
+            properties: { Name: { type: 'string' } },
+        };
+        const extraModels = resolveModels(
+            {
+                typeName: 'TypeConfigurationModel',
+                properties: { ApiEndpoint: { type: 'string' } },
+            },
+            'TypeConfigurationModel'
+        );
+        const source = generateModelsFromSchema(schema, LIB_NAME, extraModels);
+        expect(source).toContain('export class ResourceModel extends BaseModel');
+        expect(source).toContain('export class TypeConfigurationModel extends BaseModel');
     });
 });
 
@@ -781,5 +889,37 @@ describe('generateModelsFromSchema', () => {
             'export class TypeConfigurationModel extends BaseModel'
         );
         expect(source).toContain('apiToken?:');
+    });
+
+    test('schema without primaryIdentifier or additionalIdentifiers uses defaults', () => {
+        const minimalSchema: CfnResourceSchema = {
+            typeName: 'Org::Svc::Minimal',
+            properties: { Name: { type: 'string' } },
+        };
+        const source = generateModelsFromSchema(minimalSchema, LIB_NAME);
+        expect(source).toContain('export class ResourceModel extends BaseModel');
+        // No identifier keys without primaryIdentifier
+        expect(source).not.toContain('IDENTIFIER_KEY');
+    });
+});
+
+// ---------------------------------------------------------------------------
+// generateModels — default identifier params
+// ---------------------------------------------------------------------------
+
+describe('generateModels default identifier params', () => {
+    test('omitting primaryIdentifier defaults to empty array (no IDENTIFIER_KEY)', () => {
+        const models = resolveModels({
+            typeName: 'Org::Svc::NoId',
+            properties: { Name: { type: 'string' } },
+        });
+        const source = generateModels({
+            libName: LIB_NAME,
+            typeName: 'Org::Svc::NoId',
+            models,
+            // primaryIdentifier and additionalIdentifiers intentionally omitted
+        });
+        expect(source).toContain('export class ResourceModel extends BaseModel');
+        expect(source).not.toContain('IDENTIFIER_KEY');
     });
 });
