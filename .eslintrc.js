@@ -56,5 +56,12 @@ module.exports = {
                 '@typescript-eslint/no-require-imports': 'off',
             },
         },
+        {
+            // Test files routinely use empty stub implementations and jest.spyOn<any,any>
+            files: ['tests/**/*.ts'],
+            rules: {
+                '@typescript-eslint/no-empty-function': 'off',
+            },
+        },
     ],
 };

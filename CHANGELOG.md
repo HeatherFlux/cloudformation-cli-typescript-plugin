@@ -19,6 +19,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Fixed
 - [Support Library] Replace all untyped `resource['privateField']` bracket-notation accesses in tests with a typed `asTestable(resource)` helper (see `tests/lib/helpers.ts`). Tested private methods are now `protected` in `BaseResource`; tests use the public subclass API.
 - [Support Library] Convert direct `prototype.publishMessage = mock` assignments in tests to `jest.spyOn().mockImplementation()` so Jest properly restores them after each test (no prototype mutation leak).
+- [Support Library] Remove Java `serialVersionUID` constant from `BaseHandlerException` — unused in TypeScript, caused a precision-loss lint warning (the literal exceeds `Number.MAX_SAFE_INTEGER`).
+- [Support Library] Tighten `BaseHandlerException` constructor `message` param: `any` → `string`.
+- [Support Library] Tighten `Function` type annotations to precise signatures: `toModeled()` uses `(data: Dict|null|undefined) => T|null`; `typeConfigurationTypeReference.deserialize` uses `(data: Dict|null|undefined) => TypeConfiguration|null`. Also updated `BaseDto.deserialize` signature to declare the null/undefined it already handles.
+- [Support Library] `MetricsPublisher.publishExceptionMetric/publishInvocationMetric/publishDurationMetric/publishLogDeliveryExceptionMetric` return `Promise<void>` instead of `Promise<any>`.
+- [Support Library] `ProgressEvent.progress()` and `ProgressEvent.success()` model/ctx params typed as `BaseModel|null` and `Dict|null` instead of `any`.
+- [Support Library] ESLint `no-unused-vars` rule configured with `argsIgnorePattern`/`varsIgnorePattern: '^_'` to recognize the underscore-prefix convention for intentionally unused parameters.
 
 ---
 
