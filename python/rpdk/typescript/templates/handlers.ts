@@ -15,7 +15,7 @@ import { ResourceModel, TypeConfigurationModel } from './models';
 
 interface CallbackContext extends Record<string, any> {}
 
-class Resource extends BaseResource<ResourceModel> {
+class Resource extends BaseResource<ResourceModel, TypeConfigurationModel> {
 
     /**
      * CloudFormation invokes this handler when the resource is initially created
@@ -44,7 +44,7 @@ class Resource extends BaseResource<ResourceModel> {
         // Example:
         try {
             if (session instanceof SessionProxy) {
-                const client = session.client('S3');
+                // const client = session.client('S3'); // Example: create AWS clients
             }
             // Setting Status to success will signal to CloudFormation that the operation is complete
             progress.status = OperationStatus.Success;
@@ -169,8 +169,7 @@ class Resource extends BaseResource<ResourceModel> {
     }
 }
 
-// @ts-ignore // if running against v1.0.1 or earlier of plugin the 5th argument is not known but best to ignored (runtime code may warn)
-export const resource = new Resource(ResourceModel.TYPE_NAME, ResourceModel, null, null, TypeConfigurationModel)!;
+export const resource = new Resource(ResourceModel.TYPE_NAME, ResourceModel, null, null, TypeConfigurationModel);
 
 // Entrypoint for production usage after registered in CloudFormation
 export const entrypoint = resource.entrypoint;

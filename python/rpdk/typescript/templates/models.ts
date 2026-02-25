@@ -80,14 +80,14 @@ export class {{ model|uppercase_first_letter }} extends BaseModel {
         const identifier: Dict = {};
         {% for identifier in identifiers %}
         {% set components = identifier.split("/") %}
-        if ((this as any).{{components[2]|lowercase_first_letter}} != null
+        if (this.{{components[2]|lowercase_first_letter}} != null
             {%- for i in range(4, components|length + 1) -%}
-                {#- #} && (this as any)
+                {#- #} && this
                 {%- for component in components[2:i] -%} .{{component|lowercase_first_letter}} {%- endfor -%}
                 {#- #} != null
             {%- endfor -%}
         ) {
-            identifier[this.IDENTIFIER_KEY_{{ components[2:]|join('_')|upper }}] = (this as any){% for component in components[2:] %}.{{component|lowercase_first_letter}}{% endfor %};
+            identifier[this.IDENTIFIER_KEY_{{ components[2:]|join('_')|upper }}] = this{% for component in components[2:] %}.{{component|lowercase_first_letter}}{% endfor %};
         }
 
         {% endfor %}

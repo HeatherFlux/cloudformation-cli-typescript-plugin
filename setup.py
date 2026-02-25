@@ -39,7 +39,6 @@ setup(
     python_requires=">=3.8",
     install_requires=[
         "cloudformation-cli>=0.1.14",
-        "zipfile38>=0.0.3,<0.2",
     ],
     entry_points={
         "rpdk.v1.languages": [
@@ -64,6 +63,8 @@ setup(
         "Programming Language :: Python :: 3.9",
         "Programming Language :: Python :: 3.10",
         "Programming Language :: Python :: 3.11",
+        "Programming Language :: Python :: 3.12",
+        "Programming Language :: Python :: 3.13",
     ],
     keywords="Amazon Web Services AWS CloudFormation",
 )

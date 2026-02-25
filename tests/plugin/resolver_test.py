@@ -67,6 +67,22 @@ def test_contains_model_list_containing_model():
     assert contains_model(resolved_type) is True
 
 
+def test_contains_model_set_containing_model():
+    resolved_type = ResolvedType(
+        ContainerType.SET,
+        ResolvedType(ContainerType.MODEL, "Foo"),
+    )
+    assert contains_model(resolved_type) is True
+
+
+def test_contains_model_dict_containing_model():
+    resolved_type = ResolvedType(
+        ContainerType.DICT,
+        ResolvedType(ContainerType.MODEL, "Foo"),
+    )
+    assert contains_model(resolved_type) is True
+
+
 def test_inner_type_model_passthrough():
     item_type = object()
     inner_type = get_inner_type(ResolvedType(ContainerType.MODEL, item_type))
