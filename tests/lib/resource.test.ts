@@ -1030,7 +1030,10 @@ describe('when getting resource', () => {
             undefined,
             MockTypeConfigurationModel
         );
-        resource.addHandler(Action.Create, jest.fn(async () => ProgressEvent.success()));
+        resource.addHandler(
+            Action.Create,
+            jest.fn(async () => ProgressEvent.success())
+        );
         const errNoStack = new Error('no stack in entrypoint');
         delete (errNoStack as any).stack;
         jest.spyOn<any, any>(resource, 'invokeHandler').mockImplementationOnce(() => {

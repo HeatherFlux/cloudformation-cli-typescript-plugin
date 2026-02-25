@@ -254,7 +254,10 @@ describe('when getting metrics', () => {
         mockSend.mockRejectedValueOnce(
             Object.assign(new Error('Rate exceeded'), { name: 'ThrottlingException' })
         );
-        await publisher.publishLogDeliveryExceptionMetric(MOCK_DATE, new TypeError('test'));
+        await publisher.publishLogDeliveryExceptionMetric(
+            MOCK_DATE,
+            new TypeError('test')
+        );
         expect(spyLogger).toHaveBeenCalledWith(expect.any(Error));
     });
 
