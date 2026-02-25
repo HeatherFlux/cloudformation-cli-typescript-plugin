@@ -128,7 +128,7 @@ export abstract class BaseResource<
         _workerPool?: unknown,
         handlers?: HandlerSignatures<T, TypeConfiguration>,
         public readonly typeConfigurationTypeReference?: Constructor<TypeConfiguration> & {
-            deserialize: Function;
+            deserialize: (data: Dict | null | undefined) => TypeConfiguration | null;
         }
     ) {
         this.typeName = typeName || '';

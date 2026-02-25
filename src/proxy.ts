@@ -157,7 +157,7 @@ export class ProgressEvent<
     // https://github.com/microsoft/TypeScript/issues/4881
     @Exclude()
     public static builder<T extends ProgressEvent>(
-        template?: Partial<T>
+        _template?: Partial<T>
     ): IBuilder<T> | null {
         /* istanbul ignore next */
         return null;

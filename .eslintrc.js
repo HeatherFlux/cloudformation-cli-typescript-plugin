@@ -39,7 +39,7 @@ module.exports = {
         '@typescript-eslint/no-empty-function': ['warn'],
         '@typescript-eslint/no-explicit-any': ['warn'],
 
-        '@typescript-eslint/no-unused-vars': ['warn'],
+        '@typescript-eslint/no-unused-vars': ['warn', { argsIgnorePattern: '^_', varsIgnorePattern: '^_' }],
         '@typescript-eslint/no-loss-of-precision': ['warn'],
 
         // Require all imported dependencies are actually declared in package.json

@@ -173,7 +173,7 @@ export abstract class BaseDto {
 
     public static deserialize<T extends BaseDto>(
         this: new () => T,
-        jsonData: Dict,
+        jsonData: Dict | null | undefined,
         options: ClassTransformOptions = {}
     ): T | null {
         if (jsonData == null) {
@@ -187,7 +187,7 @@ export abstract class BaseDto {
     }
 
     @Exclude()
-    public toJSON(key?: string): Dict {
+    public toJSON(_key?: string): Dict {
         return this.serialize();
     }
 }
@@ -290,7 +290,9 @@ export class UnmodeledRequest extends BaseResourceHandlerRequest<BaseModel> {
 
     @Exclude()
     public toModeled<T extends BaseModel = BaseModel>(
-        modelTypeReference: Constructor<T> & { deserialize?: Function }
+        modelTypeReference: Constructor<T> & {
+            deserialize?: (data: Dict | null | undefined) => T | null;
+        }
     ): BaseResourceHandlerRequest<T> {
         const request = BaseResourceHandlerRequest.deserialize<
             BaseResourceHandlerRequest<T>
@@ -305,12 +307,12 @@ export class UnmodeledRequest extends BaseResourceHandlerRequest<BaseModel> {
             region: this.region,
             awsPartition: UnmodeledRequest.getPartition(this.region),
         })!;
-        request.desiredResourceState = modelTypeReference.deserialize?.(
-            this.desiredResourceState || {}
-        );
-        request.previousResourceState = modelTypeReference.deserialize?.(
-            this.previousResourceState || {}
-        );
+        request.desiredResourceState =
+            modelTypeReference.deserialize?.(this.desiredResourceState || {}) ??
+            undefined;
+        request.previousResourceState =
+            modelTypeReference.deserialize?.(this.previousResourceState || {}) ??
+            undefined;
         return request;
     }
 }

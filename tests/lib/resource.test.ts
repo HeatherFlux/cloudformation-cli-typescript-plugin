@@ -460,7 +460,6 @@ describe('when getting resource', () => {
     test('parse request with object literal callback context', () => {
         const callbackContext = { a: 'b' };
         entrypointPayload['callbackContext'] = { a: 'b' };
-        const resource = getResource();
         const [credentials, action, callback, request] =
             Resource.testParseRequest(entrypointPayload);
         expect(credentials).toBeDefined();
@@ -472,7 +471,6 @@ describe('when getting resource', () => {
     test('parse request with map callback context', () => {
         const callbackContext = { a: 'b' };
         entrypointPayload['callbackContext'] = callbackContext;
-        const resource = getResource();
         const [credentials, action, callback, request] =
             Resource.testParseRequest(entrypointPayload);
         expect(credentials).toBeDefined();

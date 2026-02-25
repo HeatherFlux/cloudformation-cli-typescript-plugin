@@ -2,14 +2,13 @@ import { BaseModel, HandlerErrorCode } from './interface';
 import { ProgressEvent } from './proxy';
 
 export abstract class BaseHandlerException extends Error {
-    static serialVersionUID = -1646136434112354328;
-
     public errorCode: HandlerErrorCode;
 
-    public constructor(message?: any, errorCode?: HandlerErrorCode) {
+    public constructor(message?: string, errorCode?: HandlerErrorCode) {
         super(message);
         this.errorCode =
-            errorCode || HandlerErrorCode[this.constructor.name as HandlerErrorCode];
+            errorCode ||
+            HandlerErrorCode[this.constructor.name as keyof typeof HandlerErrorCode];
         Object.setPrototypeOf(this, new.target.prototype); // restore prototype chain
     }
 
