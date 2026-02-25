@@ -1,7 +1,7 @@
 import { InvalidRequest } from './exceptions';
 import { BaseModel, Callable, integer, Integer } from './interface';
 
-type primitive = string | number | boolean | bigint | integer | object;
+type primitive = string | number | boolean | bigint | integer | object | null;
 
 /**
  * CloudFormation recasts all primitive types as strings, this tries to set them back to
@@ -35,7 +35,8 @@ export const recastPrimitive = (
         }
         throw new InvalidRequest(`Value for ${k} "${v}" is not boolean`);
     }
-    return cls(v).valueOf();
+    // cls is always a non-null-returning constructor (Boolean/Number/BigInt/Integer/String) at this point
+    return (cls(v) as NonNullable<primitive>).valueOf() as primitive;
 };
 
 export const transformValue = (

@@ -1,5 +1,6 @@
 import * as exceptions from '~/exceptions';
 import { transformValue, recastPrimitive } from '~/recast';
+import { deepFreeze } from '~/utils';
 import {
     ResourceModel as ComplexResourceModel,
     SimpleResourceModel,
@@ -24,7 +25,7 @@ describe('when recasting objects', () => {
             ABoolean: false,
         };
         const model = SimpleResourceModel.deserialize(payload);
-        expect(model.toJSON()).toMatchObject(expected);
+        expect(model!.toJSON()).toMatchObject(expected);
         const serialized = JSON.parse(JSON.stringify(model));
         expect(serialized).toMatchObject(expected);
     });
@@ -101,7 +102,7 @@ describe('when recasting objects', () => {
         const serialized = JSON.parse(JSON.stringify(model));
         expect(serialized).toMatchObject(expected);
         // re-invocations should not fail because they already type-cast payloads
-        expect(ComplexResourceModel.deserialize(serialized).serialize()).toMatchObject(
+        expect(ComplexResourceModel.deserialize(serialized)!.serialize()).toMatchObject(
             expected
         );
     });
@@ -116,7 +117,7 @@ describe('when recasting objects', () => {
         const model = TagsModel.deserialize(payload);
         const serialized = JSON.parse(JSON.stringify(model));
         expect(serialized).toMatchObject(expected);
-        expect(TagsModel.deserialize(serialized).serialize()).toMatchObject(expected);
+        expect(TagsModel.deserialize(serialized)!.serialize()).toMatchObject(expected);
     });
 
     test('recast object invalid sub type', () => {
@@ -167,5 +168,21 @@ describe('when recasting objects', () => {
         expect(num).toBeNull();
         expect(int).toBeNull();
         expect(string).toBe('');
+    });
+
+    test('transformValue with Object type is safe for circular references', () => {
+        // Object type returns the value as-is without recursing, so circular refs are safe
+        const circular: any = { a: 1 };
+        circular.self = circular;
+        const result = transformValue(Object, 'key', circular, {});
+        expect(result).toBe(circular);
+    });
+
+    test('deepFreeze handles circular references without stack overflow', () => {
+        // deepFreeze uses a processed Set to guard against circular refs
+        const obj: any = { a: 1 };
+        obj.self = obj;
+        expect(() => deepFreeze(obj)).not.toThrow();
+        expect(obj.a).toBe(1);
     });
 });

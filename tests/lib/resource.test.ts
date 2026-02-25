@@ -1,5 +1,3 @@
-import WorkerPoolAwsSdk from 'worker-pool-aws-sdk';
-
 import * as exceptions from '~/exceptions';
 import { ProgressEvent, SessionProxy } from '~/proxy';
 import {
@@ -21,21 +19,16 @@ import {
 } from '~/log-delivery';
 import { MetricsPublisherProxy } from '~/metrics';
 import { handlerEvent, HandlerSignatures, BaseResource } from '~/resource';
+import { LambdaContext } from '~/interface';
 import { SimpleStateModel } from '../data/sample-model';
 
-jest.mock('aws-sdk');
-jest.mock('aws-sdk/clients/all');
-jest.mock('aws-sdk/clients/cloudwatch');
-jest.mock('aws-sdk/clients/cloudwatchlogs');
-jest.mock('aws-sdk/clients/s3');
-jest.mock('piscina');
-jest.mock('worker_threads');
+// Minimal mock context - all usage in entrypoint/testEntrypoint uses optional chaining
+const MOCK_CTX = {} as LambdaContext;
 
 describe('when getting resource', () => {
     let entrypointPayload: any;
     let testEntrypointPayload: any;
     let lambdaContext: any;
-    let workerPool: WorkerPoolAwsSdk;
     let spySession: jest.SpyInstance;
     let spySessionClient: jest.SpyInstance;
     let spyInitializeRuntime: jest.SpyInstance;
@@ -48,14 +41,6 @@ describe('when getting resource', () => {
     class MockTypeConfigurationModel extends BaseModel {
         public static readonly TYPE_NAME: string = TYPE_NAME;
     }
-
-    beforeAll(() => {
-        jest.spyOn<any, any>(WorkerPoolAwsSdk.prototype, 'runTask').mockRejectedValue(
-            Error('Method runTask should not be called.')
-        );
-        workerPool = new WorkerPoolAwsSdk({ minThreads: 1, maxThreads: 1 });
-        workerPool.runAwsTask = null;
-    });
 
     beforeEach(() => {
         entrypointPayload = {
@@ -122,13 +107,8 @@ describe('when getting resource', () => {
     });
 
     afterEach(() => {
-        workerPool.restart();
         jest.clearAllMocks();
         jest.restoreAllMocks();
-    });
-
-    afterAll(async () => {
-        await workerPool.shutdown();
     });
 
     const getResource = (
@@ -137,7 +117,7 @@ describe('when getting resource', () => {
         const instance = new Resource(
             TYPE_NAME,
             MockModel,
-            workerPool,
+            null,
             handlers,
             MockTypeConfigurationModel
         );
@@ -146,14 +126,15 @@ describe('when getting resource', () => {
 
     test('entrypoint handler error', async () => {
         const resource = getResource();
-        const event = await resource.entrypoint({}, null);
+        const event = await resource.entrypoint({}, MOCK_CTX);
         expect(event.status).toBe(OperationStatus.Failed);
         expect(event.errorCode).toBe(HandlerErrorCode.InvalidRequest);
     });
 
     test('entrypoint missing model class', async () => {
-        const resource = new Resource(TYPE_NAME, null, null);
-        const event = await resource.entrypoint({}, null);
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const resource = new Resource(TYPE_NAME, null as any);
+        const event = await resource.entrypoint({}, MOCK_CTX);
         expect(event).toMatchObject({
             message: 'Error: Missing Model class to be used to deserialize JSON data.',
             status: OperationStatus.Failed,
@@ -167,11 +148,11 @@ describe('when getting resource', () => {
             TYPE_NAME,
             MockModel,
             null,
-            null,
+            undefined,
             MockTypeConfigurationModel
         );
         resource.addHandler(Action.Create, mockHandler);
-        const event = await resource.entrypoint(entrypointPayload, null);
+        const event = await resource.entrypoint(entrypointPayload, MOCK_CTX);
         expect(spyInitializeRuntime).toBeCalledTimes(1);
         expect(event).toMatchObject({
             message: '',
@@ -186,15 +167,17 @@ describe('when getting resource', () => {
             TYPE_NAME,
             MockModel,
             null,
-            null,
+            undefined,
             MockTypeConfigurationModel
         );
         resource.addHandler(Action.Create, jest.fn());
         const mockPublishException = jest.fn();
-        MetricsPublisherProxy.prototype['publishExceptionMetric'] =
-            mockPublishException;
+        jest.spyOn(
+            MetricsPublisherProxy.prototype,
+            'publishExceptionMetric'
+        ).mockImplementation(mockPublishException);
         const mockLog = jest.fn();
-        resource['platformLoggerProxy']['log'] = mockLog;
+        jest.spyOn(resource['platformLoggerProxy'], 'log').mockImplementation(mockLog);
         await resource['publishExceptionMetric'](Action.Create, Error('Sorry'));
         expect(mockPublishException).toBeCalledTimes(0);
         expect(mockLog).toBeCalledTimes(1);
@@ -206,12 +189,14 @@ describe('when getting resource', () => {
             TYPE_NAME,
             MockModel,
             null,
-            null,
+            undefined,
             MockTypeConfigurationModel
         );
         const mockPublishException = jest.fn();
-        MetricsPublisherProxy.prototype['publishExceptionMetric'] =
-            mockPublishException;
+        jest.spyOn(
+            MetricsPublisherProxy.prototype,
+            'publishExceptionMetric'
+        ).mockImplementation(mockPublishException);
         const spyInvokeHandler = jest.spyOn<typeof resource, any>(
             resource,
             'invokeHandler'
@@ -219,7 +204,7 @@ describe('when getting resource', () => {
         spyInvokeHandler.mockImplementation(() => {
             throw new exceptions.InvalidRequest('handler failed');
         });
-        const event = await resource.entrypoint(entrypointPayload, null);
+        const event = await resource.entrypoint(entrypointPayload, MOCK_CTX);
         expect(mockPublishException).toBeCalledTimes(1);
         expect(spyInvokeHandler).toBeCalledTimes(1);
         expect(event).toMatchObject({
@@ -235,13 +220,13 @@ describe('when getting resource', () => {
             TYPE_NAME,
             MockModel,
             null,
-            null,
+            undefined,
             MockTypeConfigurationModel
         );
         entrypointPayload['action'] = 'READ';
         const mockHandler: jest.Mock = jest.fn(() => ProgressEvent.success());
         resource.addHandler(Action.Create, mockHandler);
-        await resource.entrypoint(entrypointPayload, null);
+        await resource.entrypoint(entrypointPayload, MOCK_CTX);
     });
 
     test('entrypoint redacting credentials', async () => {
@@ -267,13 +252,13 @@ describe('when getting resource', () => {
             TYPE_NAME,
             MockModel,
             null,
-            null,
+            undefined,
             MockTypeConfigurationModel
         );
         entrypointPayload['action'] = 'READ';
         const mockHandler: jest.Mock = jest.fn(() => ProgressEvent.success());
         resource.addHandler(Action.Read, mockHandler);
-        await resource.entrypoint(entrypointPayload, null);
+        await resource.entrypoint(entrypointPayload, MOCK_CTX);
         expect(spySession).toHaveBeenCalled();
         expect(spySessionClient).toBeCalledTimes(4);
         expect(spyPrepareLogStream).toBeCalledTimes(1);
@@ -289,11 +274,11 @@ describe('when getting resource', () => {
             TYPE_NAME,
             MockModel,
             null,
-            null,
+            undefined,
             MockTypeConfigurationModel
         );
         resource.addHandler(Action.Create, mockHandler);
-        const response = await resource.entrypoint(entrypointPayload, null);
+        const response = await resource.entrypoint(entrypointPayload, MOCK_CTX);
         expect(response).toMatchObject({
             message: '',
             status: OperationStatus.Success,
@@ -318,11 +303,11 @@ describe('when getting resource', () => {
             TYPE_NAME,
             MockModel,
             null,
-            null,
+            undefined,
             MockTypeConfigurationModel
         );
         resource.addHandler(Action.Create, mockHandler);
-        const response = await resource.entrypoint(entrypointPayload, null);
+        const response = await resource.entrypoint(entrypointPayload, MOCK_CTX);
         expect(spyInitializeRuntime).toBeCalledTimes(1);
         expect(response).toMatchObject({
             message: '',
@@ -350,11 +335,11 @@ describe('when getting resource', () => {
             TYPE_NAME,
             MockModel,
             null,
-            null,
+            undefined,
             MockTypeConfigurationModel
         );
         resource.addHandler(Action.Create, mockHandler);
-        const response = await resource.entrypoint(entrypointPayload, null);
+        const response = await resource.entrypoint(entrypointPayload, MOCK_CTX);
         expect(spyInitializeRuntime).toBeCalledTimes(1);
         expect(response).toMatchObject({
             message: '',
@@ -368,7 +353,7 @@ describe('when getting resource', () => {
             expect.any(BaseResourceHandlerRequest),
             entrypointPayload.callbackContext,
             expect.any(LoggerProxy),
-            null
+            undefined // no typeConfigurationTypeReference → castTypeConfigurationRequest returns null → coerced to undefined
         );
     });
 
@@ -378,7 +363,7 @@ describe('when getting resource', () => {
             TYPE_NAME,
             MockModel,
             null,
-            null,
+            undefined,
             MockTypeConfigurationModel
         );
         resource.addHandler(Action.Create, mockHandler);
@@ -390,13 +375,13 @@ describe('when getting resource', () => {
         // Credentials are defined in payload, but null.
         entrypointPayload['requestData']['providerCredentials'] = null;
         entrypointPayload['requestData']['callerCredentials'] = null;
-        let response = await resource.entrypoint(entrypointPayload, null);
+        let response = await resource.entrypoint(entrypointPayload, MOCK_CTX);
         expect(response).toMatchObject(expected);
 
         // Credentials are undefined in payload.
         delete entrypointPayload['requestData']['providerCredentials'];
         delete entrypointPayload['requestData']['callerCredentials'];
-        response = await resource.entrypoint(entrypointPayload, null);
+        response = await resource.entrypoint(entrypointPayload, MOCK_CTX);
         expect(response).toMatchObject(expected);
     });
 
@@ -406,7 +391,7 @@ describe('when getting resource', () => {
             TYPE_NAME,
             MockModel,
             null,
-            null,
+            undefined,
             MockTypeConfigurationModel
         );
         resource.addHandler(Action.Create, mockHandler);
@@ -421,7 +406,7 @@ describe('when getting resource', () => {
             S3LogHelper.prototype,
             'doesFolderExist'
         ).mockResolvedValue(true);
-        const response = await resource.entrypoint(entrypointPayload, null);
+        const response = await resource.entrypoint(entrypointPayload, MOCK_CTX);
         expect(spyInitializeRuntime).toBeCalledTimes(1);
         expect(spySessionClient).toBeCalledTimes(4);
         expect(spyPrepareLogStream).toBeCalledTimes(1);
@@ -477,10 +462,12 @@ describe('when getting resource', () => {
 
     test('cast resource request invalid request', () => {
         const request = HandlerRequest.deserialize(entrypointPayload);
-        request.requestData = null;
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        request!.requestData = null as any;
         const resource = getResource();
         const castResourceRequest = () => {
-            resource['castResourceRequest'](request);
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+            resource['castResourceRequest'](request as any);
         };
         expect(castResourceRequest).toThrow(exceptions.InvalidRequest);
         expect(castResourceRequest).toThrow(
@@ -498,7 +485,7 @@ describe('when getting resource', () => {
             TYPE_NAME,
             MockModel,
             null,
-            null,
+            undefined,
             MockTypeConfigurationModel
         );
 
@@ -535,7 +522,7 @@ describe('when getting resource', () => {
             throw Error('exception');
         });
         const resource = getResource();
-        const event = await resource.entrypoint({}, null);
+        const event = await resource.entrypoint({}, MOCK_CTX);
         expect(mockParseRequest).toBeCalledTimes(1);
         expect(event.status).toBe(OperationStatus.Failed);
         expect(event.errorCode).toBe(HandlerErrorCode.InternalFailure);
@@ -554,7 +541,7 @@ describe('when getting resource', () => {
             TYPE_NAME,
             MockModel,
             null,
-            null,
+            undefined,
             MockTypeConfigurationModel
         );
         resource.addHandler(Action.Create, mockHandler);
@@ -569,6 +556,69 @@ describe('when getting resource', () => {
         expect(mockHandler).toBeCalledTimes(1);
     });
 
+    test('entrypoint success when waitRunningProcesses fails with Error and short remaining time', async () => {
+        jest.spyOn<any, any>(
+            Resource.prototype,
+            'waitRunningProcesses'
+        ).mockRejectedValue(new Error('Progress tracker was closed'));
+        const mockHandler: jest.Mock = jest.fn(() => ProgressEvent.success());
+        const resource = new Resource(
+            TYPE_NAME,
+            MockModel,
+            null,
+            undefined,
+            MockTypeConfigurationModel
+        );
+        resource.addHandler(Action.Create, mockHandler);
+        // remaining time ≤ 200 ms → no delay incurred, but the Error branch is exercised
+        const ctx = { ...lambdaContext, getRemainingTimeInMillis: () => 100 };
+        const event = await resource.entrypoint(entrypointPayload, ctx);
+        expect(event).toMatchObject({
+            message: '',
+            status: OperationStatus.Success,
+            callbackDelaySeconds: 0,
+        });
+    });
+
+    test('entrypoint success when waitRunningProcesses fails with Error and remaining time > 200ms', async () => {
+        jest.spyOn<any, any>(
+            Resource.prototype,
+            'waitRunningProcesses'
+        ).mockRejectedValue(new Error('Progress tracker was closed'));
+        const mockHandler: jest.Mock = jest.fn(() => ProgressEvent.success());
+        const resource = new Resource(
+            TYPE_NAME,
+            MockModel,
+            null,
+            undefined,
+            MockTypeConfigurationModel
+        );
+        resource.addHandler(Action.Create, mockHandler);
+        // remaining time > 200 ms → delay is awaited (0.001 s — trivially fast)
+        const ctx = { ...lambdaContext, getRemainingTimeInMillis: () => 201 };
+        const event = await resource.entrypoint(entrypointPayload, ctx);
+        expect(event).toMatchObject({
+            message: '',
+            status: OperationStatus.Success,
+            callbackDelaySeconds: 0,
+        });
+    });
+
+    test('entrypoint fails with InvalidTypeConfiguration when legacy resource receives typeConfiguration', async () => {
+        // Resource created WITHOUT typeConfigurationTypeReference
+        const resource = new Resource(TYPE_NAME, MockModel, null, undefined, undefined);
+        resource.addHandler(
+            Action.Create,
+            jest.fn(async () => ProgressEvent.success())
+        );
+        // entrypointPayload already has requestData.typeConfiguration set
+        const event = await resource.entrypoint(entrypointPayload, lambdaContext);
+        expect(event).toMatchObject({
+            status: OperationStatus.Failed,
+            errorCode: HandlerErrorCode.InvalidTypeConfiguration,
+        });
+    });
+
     test('entrypoint success with two consecutive calls', async () => {
         // We are emulating the execution context reuse in the lambda function
         const mockHandler: jest.Mock = jest.fn(() => ProgressEvent.success());
@@ -576,7 +626,7 @@ describe('when getting resource', () => {
             TYPE_NAME,
             MockModel,
             null,
-            null,
+            undefined,
             MockTypeConfigurationModel
         );
         resource.addHandler(Action.Create, mockHandler);
@@ -584,13 +634,13 @@ describe('when getting resource', () => {
             null
         );
         let event = await resource.entrypoint(entrypointPayload, lambdaContext);
-        expect(resource['loggerProxy']['logPublishers'].length).toBe(1);
+        expect(resource['loggerProxy'].logPublisherCount).toBe(1);
         expect(event.status).toBe(OperationStatus.Success);
         event = await resource.entrypoint(entrypointPayload, {
             ...lambdaContext,
             awsRequestId: 'd8181a30-302a-11eb-9c27-0aeffe35c30a',
         });
-        expect(resource['loggerProxy']['logPublishers'].length).toBe(1);
+        expect(resource['loggerProxy'].logPublisherCount).toBe(1);
         expect(event.status).toBe(OperationStatus.Success);
         expect(spyInitializeRuntime).toBeCalledTimes(2);
         expect(mockHandler).toBeCalledTimes(2);
@@ -613,18 +663,19 @@ describe('when getting resource', () => {
             public list(): void {}
         }
         const handlers = new HandlerSignatures<MockModel, MockTypeConfigurationModel>();
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
         const resource = new ResourceEventHandler(
+            null as any,
+            null as any,
             null,
-            null,
-            workerPool,
             handlers,
-            null
+            undefined
         );
-        expect(resource['handlers'].get(Action.Create)).toBe(resource.create);
-        expect(resource['handlers'].get(Action.Read)).toBe(resource.read);
-        expect(resource['handlers'].get(Action.Update)).toBe(resource.update);
-        expect(resource['handlers'].get(Action.Delete)).toBe(resource.delete);
-        expect(resource['handlers'].get(Action.List)).toBe(resource.list);
+        expect(resource.handlerFor(Action.Create)).toBe(resource.create);
+        expect(resource.handlerFor(Action.Read)).toBe(resource.read);
+        expect(resource.handlerFor(Action.Update)).toBe(resource.update);
+        expect(resource.handlerFor(Action.Delete)).toBe(resource.delete);
+        expect(resource.handlerFor(Action.List)).toBe(resource.list);
     });
 
     test('check resource instance and type name', async () => {
@@ -634,7 +685,7 @@ describe('when getting resource', () => {
         > {
             @handlerEvent(Action.Create)
             public async create(): Promise<ProgressEvent<MockModel>> {
-                const progress = ProgressEvent.builder<ProgressEvent<MockModel>>()
+                const progress = ProgressEvent.builder<ProgressEvent<MockModel>>()!
                     .message(this.typeName)
                     .status(OperationStatus.Success)
                     .resourceModels([])
@@ -646,11 +697,11 @@ describe('when getting resource', () => {
         const resource = new ResourceEventHandler(
             TYPE_NAME,
             MockModel,
-            workerPool,
+            null,
             handlers,
             MockTypeConfigurationModel
         );
-        const event = await resource.testEntrypoint(testEntrypointPayload, null);
+        const event = await resource.testEntrypoint(testEntrypointPayload, undefined);
         expect(event.status).toBe(OperationStatus.Success);
         expect(event.message).toBe(TYPE_NAME);
     });
@@ -660,7 +711,13 @@ describe('when getting resource', () => {
         const resource = getResource();
         const callbackContext = {};
         try {
-            await resource['invokeHandler'](null, null, Action.Create, callbackContext);
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+            await resource['invokeHandler'](
+                null,
+                null as any,
+                Action.Create,
+                callbackContext
+            );
         } catch (e) {
             expect(e).toMatchObject({
                 message: 'Unknown action CREATE',
@@ -708,15 +765,18 @@ describe('when getting resource', () => {
             const resource = getResource(handlers);
             const callbackContext = {};
             promises.push(
-                resource['invokeHandler'](null, null, action, callbackContext).catch(
-                    (e: exceptions.BaseHandlerException) => {
-                        expect(e).toMatchObject({
-                            errorCode: HandlerErrorCode.InternalFailure,
-                            message:
-                                'READ and LIST handlers must return synchronously.',
-                        });
-                    }
-                )
+                // eslint-disable-next-line @typescript-eslint/no-explicit-any
+                resource['invokeHandler'](
+                    null,
+                    null as any,
+                    action,
+                    callbackContext
+                ).catch((e: exceptions.BaseHandlerException) => {
+                    expect(e).toMatchObject({
+                        errorCode: HandlerErrorCode.InternalFailure,
+                        message: 'READ and LIST handlers must return synchronously.',
+                    });
+                })
             );
         }
         expect.assertions(promises.length);
@@ -739,10 +799,11 @@ describe('when getting resource', () => {
         request.awsAccountId = '123456789012';
         await resource['invokeHandler'](null, request, Action.Create, callbackContext);
         const modifyCurrentState = () => {
-            request.desiredResourceState.state = 'another-state';
+            request.desiredResourceState!.state = 'another-state';
         };
         const modifyPreviousState = () => {
-            request.previousResourceState = null;
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+            request.previousResourceState = null as any;
         };
         const modifyAwsAccountId = () => {
             request.awsAccountId = '';
@@ -771,7 +832,13 @@ describe('when getting resource', () => {
         resource.addHandler(Action.Create, mockHandler);
         const callbackContext = {};
         try {
-            await resource['invokeHandler'](null, null, Action.Create, callbackContext);
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+            await resource['invokeHandler'](
+                null,
+                null as any,
+                Action.Create,
+                callbackContext
+            );
         } catch (e) {
             expect(e).toMatchObject({
                 message: 'Handler failed to provide a response.',
@@ -795,7 +862,7 @@ describe('when getting resource', () => {
             TYPE_NAME,
             MockModel,
             null,
-            null,
+            undefined,
             MockTypeConfigurationModel
         );
         const [request, action, callback] =
@@ -812,7 +879,7 @@ describe('when getting resource', () => {
             TYPE_NAME,
             MockModel,
             null,
-            null,
+            undefined,
             MockTypeConfigurationModel
         );
         const [request, action, callback] =
@@ -827,7 +894,7 @@ describe('when getting resource', () => {
             TYPE_NAME,
             MockModel,
             null,
-            null,
+            undefined,
             MockTypeConfigurationModel
         );
         resource.addHandler(Action.Create, jest.fn());
@@ -847,7 +914,7 @@ describe('when getting resource', () => {
 
     test('test entrypoint handler error', async () => {
         const resource = getResource();
-        const event = await resource.testEntrypoint({}, null);
+        const event = await resource.testEntrypoint({}, undefined);
         expect(event.status).toBe(OperationStatus.Failed);
         expect(event.errorCode).toBe(HandlerErrorCode.InternalFailure);
     });
@@ -858,15 +925,16 @@ describe('when getting resource', () => {
         mockParseRequest.mockImplementationOnce(() => {
             throw Error('exception');
         });
-        const event = await resource.testEntrypoint({}, null);
+        const event = await resource.testEntrypoint({}, undefined);
         expect(event.status).toBe(OperationStatus.Failed);
         expect(event.errorCode).toBe(HandlerErrorCode.InternalFailure);
         expect(event.message).toBe('exception');
     });
 
     test('test entrypoint missing model class', async () => {
-        const resource = new Resource(TYPE_NAME, null, workerPool, null);
-        const event = await resource.testEntrypoint({}, null);
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const resource = new Resource(TYPE_NAME, null as any);
+        const event = await resource.testEntrypoint({}, undefined);
         expect(event).toMatchObject({
             message: 'Error: Missing Model class to be used to deserialize JSON data.',
             status: OperationStatus.Failed,
@@ -880,14 +948,14 @@ describe('when getting resource', () => {
             TYPE_NAME,
             MockModel,
             null,
-            null,
+            undefined,
             MockTypeConfigurationModel
         );
 
         const progressEvent = ProgressEvent.progress();
         const mockHandler: jest.Mock = jest.fn(() => progressEvent);
         resource.addHandler(Action.Create, mockHandler);
-        const event = await resource.testEntrypoint(testEntrypointPayload, null);
+        const event = await resource.testEntrypoint(testEntrypointPayload, undefined);
         expect(event).toBe(progressEvent);
 
         expect(spyDeserialize).nthCalledWith(1, { state: 'state1' });

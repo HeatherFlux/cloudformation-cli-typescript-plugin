@@ -3,7 +3,7 @@
     "compilerOptions": {
         "strict": true,
         "noImplicitAny": false,
-        "strictNullChecks": false,
+        "strictNullChecks": true,
         "strictPropertyInitialization": false,
         "allowJs": true,
         "declaration": true,

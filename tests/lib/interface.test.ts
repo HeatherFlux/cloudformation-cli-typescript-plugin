@@ -8,7 +8,8 @@ describe('when getting interface', () => {
     });
 
     test('base resource model deserialize', () => {
-        const model = SerializableModel.deserialize(null);
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const model = SerializableModel.deserialize(null as any);
         expect(model).toBeNull();
     });
 
@@ -31,7 +32,7 @@ describe('when getting interface', () => {
             somekey: 'a',
             someotherkey: 'b',
         });
-        const obj = model.toJSON();
+        const obj = model!.toJSON();
         expect(obj).toMatchObject({
             somekey: 'a',
             someotherkey: 'b',
@@ -60,8 +61,8 @@ describe('when getting interface', () => {
         const model = SerializableModel.deserialize({
             SomeInt: '35190274',
         });
-        expect(model['someint']).toBe(Integer(35190274));
-        const serialized = model.serialize();
+        expect(model!['someint']).toBe(Integer(35190274));
+        const serialized = model!.serialize();
         expect(typeof serialized['SomeInt']).toBe('number');
         expect(serialized['SomeInt']).toBe(35190274);
     });
@@ -69,7 +70,7 @@ describe('when getting interface', () => {
     test('unmodeled request partion', () => {
         const partionMap = [null, 'aws', 'aws-cn', 'aws-gov'];
         [null, 'us-east-1', 'cn-region1', 'us-gov-region1'].forEach(
-            (region: string, index: number) => {
+            (region: string | null, index: number) => {
                 const partion = UnmodeledRequest.getPartition(region);
                 expect(partion).toBe(partionMap[index]);
             }

@@ -1,7 +1,7 @@
 import 'reflect-metadata';
 import { boundMethod } from 'autobind-decorator';
 
-import { AwsTaskWorkerPool, ProgressEvent, SessionProxy } from './proxy';
+import { ProgressEvent, SessionProxy } from './proxy';
 import {
     BaseHandlerException,
     InternalFailure,
@@ -49,7 +49,7 @@ export type HandlerSignature<
     T extends BaseModel,
     TypeConfiguration extends BaseModel,
 > = Callable<
-    [Optional<SessionProxy>, any, Dict, LoggerProxy, TypeConfiguration],
+    [Optional<SessionProxy>, any, Dict, LoggerProxy, TypeConfiguration | undefined],
     Promise<ProgressEvent<T>>
 >;
 export class HandlerSignatures<
@@ -72,7 +72,7 @@ function ensureSerialize<T extends BaseModel>(toResponse = false): MethodDecorat
         // Save a reference to the original method this way we keep the values currently in the
         // descriptor and don't overwrite what another decorator might have done to the descriptor.
         if (descriptor === undefined) {
-            descriptor = Object.getOwnPropertyDescriptor(target, propertyKey);
+            descriptor = Object.getOwnPropertyDescriptor(target, propertyKey)!;
         }
         const originalMethod = descriptor.value;
         // Wrapping the original method with new signature.
@@ -110,20 +110,23 @@ export abstract class BaseResource<
 
     // provider... prefix indicates credential provided by resource owner
 
-    private providerSession: SessionProxy;
-    private callerSession: SessionProxy;
+    private providerSession: SessionProxy | null;
+    private callerSession: SessionProxy | null;
 
     private providerMetricsPublisher: MetricsPublisher;
 
     private cloudWatchLogHelper: CloudWatchLogHelper;
     private s3LogHelper: S3LogHelper;
-    private providerEventsLogger: CloudWatchLogPublisher | S3LogPublisher;
+    private providerEventsLogger: CloudWatchLogPublisher | S3LogPublisher | null;
+
+    private handlers: HandlerSignatures<T, TypeConfiguration>;
 
     constructor(
         public readonly typeName: string,
         public readonly modelTypeReference: Constructor<T>,
-        protected readonly workerPool?: AwsTaskWorkerPool,
-        private handlers?: HandlerSignatures<T, TypeConfiguration>,
+        /** @deprecated No longer used. Worker pool was an AWS SDK v2 optimisation. */
+        _workerPool?: unknown,
+        handlers?: HandlerSignatures<T, TypeConfiguration>,
         public readonly typeConfigurationTypeReference?: Constructor<TypeConfiguration> & {
             deserialize: Function;
         }
@@ -132,7 +135,7 @@ export abstract class BaseResource<
         this.handlers = handlers || new HandlerSignatures<T, TypeConfiguration>();
 
         this.lambdaLogger = console;
-        this.platformLoggerProxy = new LoggerProxy();
+        this.platformLoggerProxy = new LoggerProxy({}, this.lambdaLogger);
         this.platformLambdaLogger = new LambdaLogPublisher(this.lambdaLogger);
         this.platformLoggerProxy.addLogPublisher(this.platformLambdaLogger);
 
@@ -155,7 +158,7 @@ export abstract class BaseResource<
         region?: string,
         awsAccountId?: string
     ): Promise<void> {
-        this.loggerProxy = new LoggerProxy();
+        this.loggerProxy = new LoggerProxy({}, this.platformLoggerProxy);
         this.metricsPublisherProxy = new MetricsPublisherProxy();
         this.loggerProxy.addLogPublisher(this.platformLambdaLogger);
 
@@ -165,13 +168,17 @@ export abstract class BaseResource<
         // Both are required parameters when LoggingConfig (optional) is provided when
         // 'RegisterType'.
         if (providerCredentials) {
-            this.providerSession = SessionProxy.getSession(providerCredentials, region);
+            // getSession returns non-null when credentials are provided
+            const providerSession = SessionProxy.getSession(
+                providerCredentials,
+                region
+            )!;
+            this.providerSession = providerSession;
 
             this.providerMetricsPublisher = new MetricsPublisher(
-                this.providerSession,
+                providerSession,
                 this.platformLoggerProxy,
-                resourceType,
-                this.workerPool
+                resourceType
             );
             this.metricsPublisherProxy.addMetricsPublisher(
                 this.providerMetricsPublisher
@@ -183,36 +190,33 @@ export abstract class BaseResource<
             // there is no permission to create S3 bucket.
             const logGroupName = `${providerLogGroupName}-${awsAccountId}`;
             this.s3LogHelper = new S3LogHelper(
-                this.providerSession,
+                providerSession,
                 logGroupName,
-                providerLogStreamName,
+                providerLogStreamName ?? '',
                 this.platformLoggerProxy,
-                this.metricsPublisherProxy,
-                this.workerPool
+                this.metricsPublisherProxy
             );
             this.s3LogHelper.refreshClient();
             const folderName = await this.s3LogHelper.prepareFolder();
-            let providerS3Logger = null;
+            let providerS3Logger: S3LogPublisher | null = null;
             if (folderName) {
                 providerS3Logger = new S3LogPublisher(
-                    this.providerSession,
+                    providerSession,
                     logGroupName,
                     folderName,
                     this.platformLoggerProxy,
-                    this.metricsPublisherProxy,
-                    this.workerPool
+                    this.metricsPublisherProxy
                 );
                 this.loggerProxy.addLogPublisher(providerS3Logger);
                 providerS3Logger.refreshClient();
             }
             try {
                 this.cloudWatchLogHelper = new CloudWatchLogHelper(
-                    this.providerSession,
+                    providerSession,
                     providerLogGroupName,
-                    providerLogStreamName,
+                    providerLogStreamName ?? '',
                     this.platformLoggerProxy,
-                    this.metricsPublisherProxy,
-                    this.workerPool
+                    this.metricsPublisherProxy
                 );
                 this.cloudWatchLogHelper.refreshClient();
                 const logStreamName = await this.cloudWatchLogHelper.prepareLogStream();
@@ -220,12 +224,11 @@ export abstract class BaseResource<
                     throw new Error('Unable to setup CloudWatch logs.');
                 }
                 this.providerEventsLogger = new CloudWatchLogPublisher(
-                    this.providerSession,
+                    providerSession,
                     providerLogGroupName,
                     logStreamName,
                     this.platformLoggerProxy,
-                    this.metricsPublisherProxy,
-                    this.workerPool
+                    this.metricsPublisherProxy
                 );
                 this.loggerProxy.addLogPublisher(this.providerEventsLogger);
                 this.providerEventsLogger.refreshClient();
@@ -239,13 +242,19 @@ export abstract class BaseResource<
         }
     }
 
-    private prepareCredentialsFilter(session: SessionProxy): LogFilter {
+    private prepareCredentialsFilter(
+        session: SessionProxy | null | undefined
+    ): LogFilter | null {
         const credentials = session?.configuration?.credentials;
         if (credentials) {
             return {
                 applyFilter: (message: string): string => {
                     for (const value of Object.values(credentials)) {
-                        message = replaceAll(message, value, '<REDACTED>');
+                        // Only redact string values (e.g. accessKeyId, secretAccessKey,
+                        // sessionToken). Skip Dates and other non-string credential fields.
+                        if (typeof value === 'string') {
+                            message = replaceAll(message, value, '<REDACTED>');
+                        }
                     }
                     return message;
                 },
@@ -256,20 +265,12 @@ export abstract class BaseResource<
 
     private async waitRunningProcesses() {
         this.log('Waiting for logger proxy processes to finish...');
-        if (this.workerPool) {
-            this.log(
-                `Prepare worker pool for shutdown.\tNumber of completed tasks: ${this.workerPool.completed}\tLength of time since instance was created: ${this.workerPool.duration} ms`
-            );
-        }
         await delay(1);
         if (this.loggerProxy) {
             await this.loggerProxy.waitCompletion();
         }
         await this.platformLoggerProxy.waitCompletion();
         this.log('Log delivery completed.');
-        if (this.workerPool) {
-            await this.workerPool.shutdown();
-        }
     }
 
     /*
@@ -278,14 +279,14 @@ export abstract class BaseResource<
     private async publishExceptionMetric(action: Action, err: Error): Promise<void> {
         if (this.metricsPublisherProxy) {
             await this.metricsPublisherProxy.publishExceptionMetric(
-                new Date(Date.now()),
+                new Date(),
                 action,
                 err
             );
         } else {
             // The platform logger's is the only fallback if metrics publisher proxy is not
             // initialized.
-            this.platformLoggerProxy.tracker.done = false;
+            this.platformLoggerProxy.markPending();
             this.platformLoggerProxy.log(err.toString());
         }
     }
@@ -298,12 +299,12 @@ export abstract class BaseResource<
      */
     private log(message?: any, ...optionalParams: any[]): void {
         if (this.loggerProxy) {
-            this.loggerProxy.tracker.done = false;
+            this.loggerProxy.markPending();
             this.loggerProxy.log(message, ...optionalParams);
         } else {
             // The platform logger's is the only fallback if metrics publisher proxy is not
             // initialized.
-            this.platformLoggerProxy.tracker.done = false;
+            this.platformLoggerProxy.markPending();
             this.platformLoggerProxy.log(message, ...optionalParams);
         }
     }
@@ -315,6 +316,12 @@ export abstract class BaseResource<
         this.handlers.set(action, f);
         return f;
     };
+
+    public handlerFor(
+        action: Action
+    ): HandlerSignature<T, TypeConfiguration> | undefined {
+        return this.handlers.get(action);
+    }
 
     private invokeHandler = async (
         session: Optional<SessionProxy>,
@@ -328,7 +335,7 @@ export abstract class BaseResource<
             throw new Error(`Unknown action ${actionName}`);
         }
         const handleRequest: HandlerSignature<T, TypeConfiguration> =
-            this.handlers.get(action);
+            this.handlers.get(action)!;
         // We will make the callback context and resource states readonly
         // to avoid modification at a later time
         deepFreeze(callbackContext);
@@ -366,14 +373,14 @@ export abstract class BaseResource<
         let event: TestEvent;
         let callbackContext: Dict;
         try {
-            event = TestEvent.deserialize(eventData);
+            event = TestEvent.deserialize(eventData)!;
             const creds = event.credentials as Credentials;
             if (!creds) {
                 throw new Error(
                     'Event data is missing required property "credentials".'
                 );
             }
-            request = UnmodeledRequest.deserialize(event.request).toModeled<T>(
+            request = UnmodeledRequest.deserialize(event.request)!.toModeled<T>(
                 this.modelTypeReference
             );
 
@@ -385,12 +392,12 @@ export abstract class BaseResource<
             if (err instanceof Error) {
                 throw new InternalFailure(`${err} (${err.name})`);
             }
+            throw new InternalFailure('Unknown error parsing request');
         }
 
         return [request, action, callbackContext];
     };
 
-    // @ts-ignore
     public async testEntrypoint(
         eventData: any | Dict,
         context?: Partial<LambdaContext>
@@ -402,7 +409,7 @@ export abstract class BaseResource<
         context?: Partial<LambdaContext>
     ): Promise<ProgressEvent<T>> {
         let msg = 'Uninitialized';
-        let progress: ProgressEvent<T>;
+        let progress: ProgressEvent<T> | undefined;
         try {
             if (!this.modelTypeReference) {
                 throw new InternalFailure(
@@ -441,7 +448,7 @@ export abstract class BaseResource<
         }
         this.log(`END RequestId: ${context?.awsRequestId}`);
         await this.waitRunningProcesses();
-        return Promise.resolve(progress);
+        return Promise.resolve(progress!);
     }
 
     private static parseRequest = (
@@ -453,20 +460,22 @@ export abstract class BaseResource<
         let callbackContext: Dict;
         let event: HandlerRequest;
         try {
-            event = HandlerRequest.deserialize(eventData);
+            event = HandlerRequest.deserialize(eventData) as HandlerRequest;
             if (!event.awsAccountId) {
                 throw new Error(
                     'Event data is missing required property "awsAccountId".'
                 );
             }
             callerCredentials = event.requestData.callerCredentials;
-            providerCredentials = event.requestData.providerCredentials;
+            // providerCredentials is always present in production CloudFormation events
+            providerCredentials = event.requestData.providerCredentials!;
             action = event.action;
             callbackContext = event.callbackContext || {};
         } catch (err) {
             if (err instanceof Error) {
                 throw new InvalidRequest(`${err} (${err.name})`);
             }
+            throw new InvalidRequest('Unknown error parsing event');
         }
         return [
             [callerCredentials, providerCredentials],
@@ -494,14 +503,15 @@ export abstract class BaseResource<
             return unmodeled.toModeled<T>(this.modelTypeReference);
         } catch (err) {
             this.log('Invalid request');
-            // @ts-expect-error fix with v3 sdk
-            throw new InvalidRequest(`${err} (${err.name})`);
+            throw new InvalidRequest(
+                `${err} (${err instanceof Error ? err.name : 'UnknownError'})`
+            );
         }
     };
 
     private castTypeConfigurationRequest = (
         request: HandlerRequest
-    ): TypeConfiguration => {
+    ): TypeConfiguration | null => {
         try {
             if (!this.typeConfigurationTypeReference) {
                 if (request.requestData.typeConfiguration) {
@@ -516,8 +526,10 @@ export abstract class BaseResource<
             );
         } catch (err) {
             this.log('Invalid Type Configuration');
-            // @ts-expect-error fix with v3 sdk
-            throw new InvalidTypeConfiguration(this.typeName, `${err} (${err.name}`);
+            throw new InvalidTypeConfiguration(
+                this.typeName,
+                `${err} (${err instanceof Error ? err.name : 'UnknownError'}`
+            );
         }
     };
 
@@ -531,9 +543,9 @@ export abstract class BaseResource<
         eventData: Dict,
         context: LambdaContext
     ): Promise<ProgressEvent<T>> {
-        let progress: ProgressEvent<T>;
+        let progress: ProgressEvent<T> | undefined;
         let bearerToken: string;
-        let milliseconds: number = null;
+        let milliseconds: number | null = null;
         try {
             if (!this.modelTypeReference) {
                 throw new InternalFailure(
@@ -557,7 +569,7 @@ export abstract class BaseResource<
             await this.initializeRuntime(
                 event.resourceType || this.typeName,
                 providerCredentials,
-                event.requestData?.providerLogGroupName,
+                event.requestData.providerLogGroupName ?? '',
                 streamName,
                 event.region,
                 event.awsAccountId
@@ -566,9 +578,9 @@ export abstract class BaseResource<
                 `START RequestId: ${context?.awsRequestId} Version: ${context?.functionVersion}`
             );
 
-            const startTime = new Date(Date.now());
+            const startTime = new Date();
             await this.metricsPublisherProxy.publishInvocationMetric(startTime, action);
-            let error: Error;
+            let error: Error | undefined;
             try {
                 // Last mile proxy creation with passed-in credentials (unless we are operating
                 // in a non-AWS model)
@@ -598,14 +610,14 @@ export abstract class BaseResource<
                     request,
                     action,
                     callback,
-                    typeConfiguration
+                    typeConfiguration ?? undefined
                 );
             } catch (err) {
                 if (err instanceof Error) {
                     error = err;
                 }
             }
-            const endTime = new Date(Date.now());
+            const endTime = new Date();
             milliseconds = endTime.getTime() - startTime.getTime();
             await this.metricsPublisherProxy.publishDurationMetric(
                 endTime,
@@ -643,16 +655,13 @@ export abstract class BaseResource<
         } catch (err) {
             if (err instanceof Error) {
                 this.lambdaLogger.log(err);
-                await delay(2);
-                /* TODO: Check if the real remaining time from CloudFormation can be calculated
-                // Wait for as long as possible (basically until the end of the lambda process)
-                const remainingTime = context ? context.getRemainingTimeInMillis() : 0;
-                if (remainingTime > 200) {
-                    await delay((remainingTime - 200) / 100);
-                } */
+                const remainingMs = context?.getRemainingTimeInMillis?.() ?? 0;
+                if (remainingMs > 200) {
+                    await delay((remainingMs - 200) / 1000);
+                }
             }
         }
-        return progress;
+        return progress!;
     }
 }
 
@@ -683,5 +692,6 @@ export function handlerEvent(action: Action): MethodDecorator {
             }
             return descriptor;
         }
+        return descriptor;
     };
 }

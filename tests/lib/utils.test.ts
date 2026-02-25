@@ -1,4 +1,4 @@
-import { deepFreeze, replaceAll } from '~/utils';
+import { deepFreeze, ProgressTracker, replaceAll } from '~/utils';
 
 describe('when getting utils', () => {
     afterEach(() => {
@@ -8,9 +8,14 @@ describe('when getting utils', () => {
 
     describe('replace all', () => {
         test('should skip replace falsy', () => {
-            expect(replaceAll(null, null, null)).toBe(null);
-            expect(replaceAll(undefined, null, null)).toBe(undefined);
-            expect(replaceAll('', null, null)).toBe('');
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+            expect(replaceAll(null as any, null as any, null as any)).toBe(null);
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+            expect(replaceAll(undefined as any, null as any, null as any)).toBe(
+                undefined
+            );
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+            expect(replaceAll('', null as any, null as any)).toBe('');
         });
 
         test('should replace all occurrences', () => {
@@ -257,6 +262,35 @@ describe('when getting utils', () => {
             deepFreeze(proto);
             expect(Object.isFrozen(proto)).toBe(true);
             expect(Object.isFrozen(Object.getPrototypeOf(proto))).toBe(false);
+        });
+    });
+
+    describe('progress tracker', () => {
+        test('message with no tasks submitted', () => {
+            const tracker = new ProgressTracker();
+            expect(tracker.message).toMatch(/0\.00%/);
+            expect(tracker.message).not.toContain('NaN');
+            expect(tracker.message).not.toContain('Infinity');
+        });
+
+        test('message with tasks submitted shows correct percentage', () => {
+            const tracker = new ProgressTracker();
+            tracker.addSubmitted();
+            tracker.addSubmitted();
+            tracker.addSubmitted();
+            tracker.addSubmitted();
+            tracker.addCompleted();
+            tracker.addCompleted();
+            expect(tracker.message).toContain('2 of 4 completed');
+            expect(tracker.message).toContain('50.00%');
+        });
+
+        test('addSubmitted throws after tracker is closed', () => {
+            const tracker = new ProgressTracker();
+            tracker.end(); // done=true, submitted=0, completed=0 → isFinished=true
+            expect(() => tracker.addSubmitted()).toThrow(
+                'Not allowed to submit a new task after progress tracker has been closed.'
+            );
         });
     });
 });

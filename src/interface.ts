@@ -1,12 +1,5 @@
 import 'reflect-metadata';
 import {
-    ClientRequestToken,
-    LogGroupName,
-    LogicalResourceId,
-    NextToken,
-} from 'aws-sdk/clients/cloudformation';
-import { Service } from 'aws-sdk/lib/service';
-import {
     ClassTransformOptions,
     Exclude,
     Expose,
@@ -14,61 +7,26 @@ import {
     plainToInstance,
 } from 'class-transformer';
 
+// These types were previously imported from aws-sdk v2 CloudFormation client.
+// Defined locally to remove the sdk v2 dependency.
+type ClientRequestToken = string;
+type LogGroupName = string;
+type LogicalResourceId = string;
+
+/** Pagination token returned by list operations. */
+export type NextToken = string;
+
 export type Optional<T> = T | undefined | null;
 export type Dict<T = any> = Record<string, T>;
 export type Constructor<T = {}> = new (...args: any[]) => T;
 export type integer = bigint;
 
-export type InstanceProperties<
-    T extends object = Service,
-    C extends Constructor<T> = Constructor<T>,
-> = keyof InstanceType<C>;
-
-export type ServiceProperties<
-    S extends Service = Service,
-    C extends Constructor<S> = Constructor<S>,
-> = Exclude<
-    InstanceProperties<S, C>,
-    InstanceProperties<Service, Constructor<Service>>
->;
-
-export type OverloadedArguments<T> = T extends {
-    (...args: any[]): any;
-    (params: infer P, callback: any): any;
-    (callback: any): any;
-}
-    ? P
-    : T extends {
-            (params: infer P, callback: any): any;
-            (callback: any): any;
-        }
-      ? P
-      : T extends (params: infer P, callback: any) => any
-        ? P
-        : any;
-
-export type OverloadedReturnType<T> = T extends {
-    (...args: any[]): any;
-    (params: any, callback: any): infer R;
-    (callback: any): any;
-}
-    ? R
-    : T extends {
-            (params: any, callback: any): infer R;
-            (callback: any): any;
-        }
-      ? R
-      : T extends (callback: any) => infer R
-        ? R
-        : any;
-
 export interface Callable<R extends Array<any>, T> {
     (...args: R): T;
 }
 
-// @ts-ignore
-// eslint-disable-next-line
-interface Integer extends BigInt {
+// @ts-expect-error TypeScript does not allow interfaces to extend primitive BigInt
+interface Integer extends bigint {
     /**
      * Defines the default JSON representation of
      * Integer (BigInt) to be a number.
@@ -81,7 +39,7 @@ interface Integer extends BigInt {
     readonly [Symbol.toStringTag]: 'Integer';
 }
 
-// @ts-ignore
+// @ts-expect-error TypeScript does not allow interfaces to extend BigIntConstructor
 interface IntegerConstructor extends BigIntConstructor {
     (value?: bigint | integer | boolean | number | string): bigint;
     readonly prototype: Integer;
@@ -96,9 +54,9 @@ interface IntegerConstructor extends BigIntConstructor {
 /**
  * Wrapper with additional JSON serialization for bigint type
  */
-// @ts-ignore
+// @ts-expect-error new Proxy(BigInt, handler) is not assignable to IntegerConstructor
 export const Integer: IntegerConstructor = new Proxy(BigInt, {
-    // @ts-ignore
+    // @ts-expect-error Proxy apply trap signature does not match IntegerConstructor exactly
     apply(
         target: IntegerConstructor,
         _thisArg: unknown,
@@ -217,7 +175,7 @@ export abstract class BaseDto {
         this: new () => T,
         jsonData: Dict,
         options: ClassTransformOptions = {}
-    ): T {
+    ): T | null {
         if (jsonData == null) {
             return null;
         }
@@ -313,7 +271,7 @@ export class BaseResourceHandlerRequest<T extends BaseModel> extends BaseDto {
 export class UnmodeledRequest extends BaseResourceHandlerRequest<BaseModel> {
     @Exclude()
     public static fromUnmodeled(obj: Dict): UnmodeledRequest {
-        return UnmodeledRequest.deserialize(obj);
+        return UnmodeledRequest.deserialize(obj)!;
     }
 
     @Exclude()
@@ -346,11 +304,11 @@ export class UnmodeledRequest extends BaseResourceHandlerRequest<BaseModel> {
             nextToken: this.nextToken,
             region: this.region,
             awsPartition: UnmodeledRequest.getPartition(this.region),
-        });
-        request.desiredResourceState = modelTypeReference.deserialize(
+        })!;
+        request.desiredResourceState = modelTypeReference.deserialize?.(
             this.desiredResourceState || {}
         );
-        request.previousResourceState = modelTypeReference.deserialize(
+        request.previousResourceState = modelTypeReference.deserialize?.(
             this.previousResourceState || {}
         );
         return request;

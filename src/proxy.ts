@@ -1,255 +1,148 @@
-import { AWSError } from 'aws-sdk';
-import Aws from 'aws-sdk/clients/all';
-import { NextToken } from 'aws-sdk/clients/cloudformation';
-import { CredentialsOptions } from 'aws-sdk/lib/credentials';
-import { PromiseResult } from 'aws-sdk/lib/request';
-import { Service, ServiceConfigurationOptions } from 'aws-sdk/lib/service';
-import { EventEmitter } from 'events';
+import { AwsCredentialIdentity } from '@smithy/types';
 import { builder, IBuilder } from '@org-formation/tombok';
-import { Exclude, Expose, Type } from 'class-transformer';
+import { Exclude, Expose } from 'class-transformer';
 
 import {
     BaseDto,
     BaseResourceHandlerRequest,
     BaseModel,
-    Constructor,
     Dict,
     HandlerErrorCode,
+    NextToken,
     OperationStatus,
-    OverloadedArguments,
-    ServiceProperties,
 } from './interface';
 
-type ClientMap = typeof Aws;
-export type ClientName = keyof ClientMap;
-export type Client = InstanceType<ClientMap[ClientName]>;
-
-export type Result<T> = T extends (...args: any) => infer R ? R : any;
-export type Input<T> = T extends (...args: infer P) => any ? P : never;
-export type ServiceOptions<S extends Service = Service> = ConstructorParameters<
-    Constructor<S>
->[0];
-export type ServiceOperation<
-    S extends Service = Service,
-    C extends Constructor<S> = Constructor<S>,
-    O extends ServiceProperties<S, C> = ServiceProperties<S, C>,
-    E extends Error = AWSError,
-> = InstanceType<C>[O] & {
-    promise(): Promise<PromiseResult<any, E>>;
-};
-export type InferredResult<
-    S extends Service = Service,
-    C extends Constructor<S> = Constructor<S>,
-    O extends ServiceProperties<S, C> = ServiceProperties<S, C>,
-    E extends Error = AWSError,
-    N extends ServiceOperation<S, C, O, E> = ServiceOperation<S, C, O, E>,
-> = Input<Input<Result<Result<N>['promise']>['then']>[0]>[0];
-
-type AwsTaskSignature = <
-    S extends Service = Service,
-    C extends Constructor<S> = Constructor<S>,
-    O extends ServiceProperties<S, C> = ServiceProperties<S, C>,
-    E extends Error = AWSError,
-    N extends ServiceOperation<S, C, O, E> = ServiceOperation<S, C, O, E>,
->(
-    params: any
-) => Promise<InferredResult<S, C, O, E, N>>;
+/**
+ * Configuration options passed to AWS SDK v3 client constructors.
+ * All AWS SDK v3 clients accept at minimum `credentials` and `region`.
+ */
+export interface ClientConfig {
+    credentials?: AwsCredentialIdentity;
+    region?: string;
+    [key: string]: unknown;
+}
 
 /**
- * Promise final result Type from a AWS Service Function
+ * A session that vends pre-configured AWS SDK v3 clients.
  *
- * @param S Type of the AWS Service
- * @param C Type of the constructor function of the AWS Service
- * @param O Names of the operations (method) within the service
- * @param E Type of the error thrown by the service function
- * @param N Type of the service function inferred by the given operation name
+ * @example
+ * ```typescript
+ * import { S3Client } from '@aws-sdk/client-s3';
+ *
+ * const s3 = session.client(S3Client);
+ * await s3.send(new PutObjectCommand({ Bucket: '...', Key: '...', Body: '...' }));
+ * ```
  */
-export type ExtendedClient<S extends Service = Service> = S & {
-    serviceIdentifier?: string;
-    makeRequestPromise?: <
-        C extends Constructor<S> = Constructor<S>,
-        O extends ServiceProperties<S, C> = ServiceProperties<S, C>,
-        E extends Error = AWSError,
-        N extends ServiceOperation<S, C, O, E> = ServiceOperation<S, C, O, E>,
-    >(
-        operation: O,
-        input?: OverloadedArguments<N>,
-        headers?: Record<string, string>
-    ) => Promise<InferredResult<S, C, O, E, N>>;
-};
-export interface AwsTaskWorkerPool extends EventEmitter {
-    runAwsTask: AwsTaskSignature;
-    shutdown: (doDestroy?: boolean) => Promise<boolean>;
-    completed?: number;
-    duration?: number;
-}
 export interface Session {
-    client: <S extends Service>(
-        service: ClientName | S | Constructor<S>,
-        options?: ServiceConfigurationOptions
-    ) => ExtendedClient<S>;
+    /**
+     * Creates a new AWS SDK v3 client, injecting the session credentials and region.
+     *
+     * @param ClientClass - An AWS SDK v3 client constructor (e.g. `S3Client`, `CloudWatchLogsClient`)
+     * @param options     - Optional overrides merged on top of the session config
+     * @returns A ready-to-use client instance
+     */
+    client<T>(ClientClass: new (config: ClientConfig) => T, options?: ClientConfig): T;
 }
 
+/**
+ * Concrete implementation of `Session` that holds AWS credentials and region,
+ * and uses them to instantiate AWS SDK v3 clients.
+ *
+ * Obtain an instance via `SessionProxy.getSession(credentials, region)`.
+ */
 export class SessionProxy implements Session {
-    constructor(private options: ServiceConfigurationOptions) {}
+    constructor(private readonly config: ClientConfig) {}
 
-    private extendAwsClient<
-        S extends Service = Service,
-        C extends Constructor<S> = Constructor<S>,
-        O extends ServiceProperties<S, C> = ServiceProperties<S, C>,
-        E extends Error = AWSError,
-        N extends ServiceOperation<S, C, O, E> = ServiceOperation<S, C, O, E>,
-    >(
-        service: S,
-        options?: ServiceConfigurationOptions,
-        workerPool?: AwsTaskWorkerPool
-    ): ExtendedClient<S> {
-        const client: ExtendedClient<S> = new Proxy(service, {
-            get(obj: ExtendedClient<S>, prop: string) {
-                if ('makeRequestPromise' === prop) {
-                    // Extend AWS client with promisified make request method
-                    // that can be used with worker pool
-                    return async (
-                        operation: O,
-                        input?: OverloadedArguments<N>,
-                        headers?: Record<string, string>
-                    ): Promise<InferredResult<S, C, O, E, N>> => {
-                        if (workerPool && workerPool.runAwsTask) {
-                            try {
-                                const result = await workerPool.runAwsTask<
-                                    S,
-                                    C,
-                                    O,
-                                    E,
-                                    N
-                                >({
-                                    name: obj.serviceIdentifier,
-                                    options,
-                                    operation,
-                                    input,
-                                    headers,
-                                });
-                                return result;
-                            } catch (err) {
-                                console.log(err);
-                            }
-                        }
-                        const request = obj.makeRequest(operation as string, input);
-                        const headerEntries = Object.entries(headers || {});
-                        if (headerEntries.length) {
-                            request.on('build', () => {
-                                for (const [key, value] of headerEntries) {
-                                    request.httpRequest.headers[key] = value;
-                                }
-                            });
-                        }
-                        return await request.promise();
-                    };
-                }
-                return obj[prop];
-            },
-        });
-        if (client.config && client.config.update) {
-            client.config.update(options);
-        }
-        return client;
+    /**
+     * Creates an AWS SDK v3 client using the session credentials.
+     *
+     * @param ClientClass - An AWS SDK v3 client constructor
+     * @param options     - Optional per-call overrides (e.g. a different region)
+     */
+    client<T>(ClientClass: new (config: ClientConfig) => T, options?: ClientConfig): T {
+        return new ClientClass({ ...this.config, ...options });
     }
 
-    public client<S extends Service = Service>(
-        service: ClientName | S | Constructor<S>,
-        options?: ServiceConfigurationOptions,
-        workerPool?: AwsTaskWorkerPool
-    ): ExtendedClient<S> {
-        const updatedConfig = { ...this.options, ...options };
-        let ctor: Constructor<S>;
-        let client: ExtendedClient<S>;
-        if (typeof service === 'string') {
-            // Kept for backward compatibility
-            const clients: { [K in ClientName]: ClientMap[K] } = Aws;
-            ctor = clients[service] as unknown as Constructor<S>;
-        } else if (typeof service === 'function') {
-            ctor = service as Constructor<S>;
-        } else {
-            client = this.extendAwsClient(service, updatedConfig, workerPool);
-        }
-        if (!client) {
-            client = this.extendAwsClient(
-                new ctor(updatedConfig),
-                updatedConfig,
-                workerPool
-            );
-        }
-        return client;
+    /** Returns the raw config object (credentials + region) used by this session. */
+    get configuration(): ClientConfig {
+        return this.config;
     }
 
-    get configuration(): ServiceConfigurationOptions {
-        return this.options;
-    }
-
+    /**
+     * Factory method — returns `null` when no credentials are provided (unauthenticated path).
+     *
+     * @param credentials - AWS credential identity (accessKeyId + secretAccessKey + sessionToken)
+     * @param region      - AWS region string, e.g. `'us-east-1'`
+     */
     public static getSession(
-        credentials?: CredentialsOptions,
+        credentials?: AwsCredentialIdentity,
         region?: string
     ): SessionProxy | null {
         if (!credentials) {
             return null;
         }
-        return new SessionProxy({
-            credentials,
-            region,
-        });
+        return new SessionProxy({ credentials, region });
     }
 }
 
+/**
+ * Represents the result of a resource handler invocation.
+ *
+ * Use the static factory helpers instead of constructing directly:
+ * - `ProgressEvent.success(model)` — terminal success
+ * - `ProgressEvent.failed(errorCode, message)` — terminal failure
+ * - `ProgressEvent.progress(model, ctx)` — in-progress, will be re-invoked
+ */
 @builder
 export class ProgressEvent<
     ResourceT extends BaseModel = BaseModel,
     CallbackT = Dict,
 > extends BaseDto {
     /**
-     * The status indicates whether the handler has reached a terminal state or is
-     * still computing and requires more time to complete
+     * Indicates whether the handler has reached a terminal state or is still
+     * computing and requires more time to complete.
      */
     @Expose() status: OperationStatus;
 
     /**
-     * If OperationStatus is FAILED or IN_PROGRESS, an error code should be provided
+     * If `OperationStatus` is `FAILED` or `IN_PROGRESS`, an error code should be
+     * provided to give callers context about why the operation has not succeeded.
      */
     @Expose() errorCode?: HandlerErrorCode;
 
     /**
-     * The handler can (and should) specify a contextual information message which
-     * can be shown to callers to indicate the nature of a progress transition or
-     * callback delay; for example a message indicating "propagating to edge"
+     * A human-readable message describing the current state of the operation.
+     * Shown to callers in the CloudFormation console and API responses.
      */
     @Expose() message = '';
 
     /**
-     * The callback context is an arbitrary datum which the handler can return in an
-     * IN_PROGRESS event to allow the passing through of additional state or
-     * metadata between subsequent retries; for example to pass through a Resource
-     * identifier which can be used to continue polling for stabilization
+     * Arbitrary data the handler returns on an `IN_PROGRESS` response, which will
+     * be passed back verbatim on the next invocation as `callbackContext`.
+     * Use this to persist identifiers or polling state between retries.
      */
     @Expose() callbackContext?: CallbackT;
 
     /**
-     * A callback will be scheduled with an initial delay of no less than the number
-     * of seconds specified in the progress event.
+     * Minimum number of seconds to wait before the next callback.
+     * Defaults to 0 (retry immediately).
      */
     @Expose() callbackDelaySeconds = 0;
 
     /**
-     * The output resource instance populated by a READ for synchronous results and
-     * by CREATE/UPDATE/DELETE for final response validation/confirmation
+     * The output resource instance populated by a READ handler, or by
+     * CREATE/UPDATE/DELETE for final response validation/confirmation.
      */
     @Expose() resourceModel?: ResourceT;
 
     /**
-     * The output resource instances populated by a LIST for synchronous results
+     * Output resource instances populated by a LIST handler.
      */
     @Expose() resourceModels?: Array<ResourceT>;
 
     /**
-     * The token used to request additional pages of resources for a LIST operation
+     * Pagination token for LIST operations.
+     * Pass this back to CloudFormation to request the next page.
      */
     @Expose() nextToken?: NextToken;
 
@@ -260,22 +153,28 @@ export class ProgressEvent<
         }
     }
 
-    // TODO: remove workaround when decorator mutation implemented: https://github.com/microsoft/TypeScript/issues/4881
+    // TODO: remove workaround when decorator mutation implemented:
+    // https://github.com/microsoft/TypeScript/issues/4881
     @Exclude()
-    public static builder<T extends ProgressEvent>(template?: Partial<T>): IBuilder<T> {
+    public static builder<T extends ProgressEvent>(
+        template?: Partial<T>
+    ): IBuilder<T> | null {
         /* istanbul ignore next */
         return null;
     }
 
     /**
-     * Convenience method for constructing FAILED response
+     * Constructs a terminal `FAILED` response.
+     *
+     * @param errorCode - A `HandlerErrorCode` describing the failure category
+     * @param message   - Human-readable description of what went wrong
      */
     @Exclude()
     public static failed<T extends ProgressEvent>(
         errorCode: HandlerErrorCode,
         message: string
     ): T {
-        const event = ProgressEvent.builder<T>()
+        const event = ProgressEvent.builder<T>()!
             .status(OperationStatus.Failed)
             .errorCode(errorCode)
             .message(message)
@@ -284,11 +183,14 @@ export class ProgressEvent<
     }
 
     /**
-     * Convenience method for constructing IN_PROGRESS response
+     * Constructs an `IN_PROGRESS` response, optionally with a model and callback context.
+     *
+     * @param model - Optional partial resource model to return with the in-progress event
+     * @param ctx   - Optional callback context persisted between invocations
      */
     @Exclude()
     public static progress<T extends ProgressEvent>(model?: any, ctx?: any): T {
-        const progress = ProgressEvent.builder<T>().status(OperationStatus.InProgress);
+        const progress = ProgressEvent.builder<T>()!.status(OperationStatus.InProgress);
         if (ctx) {
             progress.callbackContext(ctx);
         }
@@ -300,7 +202,10 @@ export class ProgressEvent<
     }
 
     /**
-     * Convenience method for constructing a SUCCESS response
+     * Constructs a terminal `SUCCESS` response.
+     *
+     * @param model - Optional resource model to return with the success event
+     * @param ctx   - Optional callback context (rarely needed for terminal events)
      */
     @Exclude()
     public static success<T extends ProgressEvent>(model?: any, ctx?: any): T {
@@ -311,11 +216,10 @@ export class ProgressEvent<
 }
 
 /**
- * This interface describes the request object for the provisioning request
- * passed to the implementor. It is transformed from an instance of
- * HandlerRequest by the LambdaWrapper to only items of concern
+ * The request object passed to every resource handler method.
+ * Constructed by the runtime from the incoming CloudFormation event.
  *
- * @param <T> Type of resource model being provisioned
+ * @typeParam T - The resource model type
  */
 export class ResourceHandlerRequest<
     T extends BaseModel,
