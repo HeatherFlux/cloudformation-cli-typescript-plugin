@@ -12,6 +12,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - [CLI Plugin] `_validate_build_prerequisites()` — pre-flight check before the build subprocess. Validates that `npm`, `node` (≥ 20), and `sam` (when using the default build command) are available on PATH, surfacing clear `DownstreamError` messages instead of cryptic subprocess failures.
 - [CLI Plugin] `data/support-lib-version.txt` — single source of truth for the npm support library version used in generated `package.json` files. Update this file (e.g. `echo 'X.Y.Z' > ...`) when bumping the npm package version; the Python plugin reads it dynamically at load time.
 
+### Fixed
+- [Support Library] Removed unused `mockSendResult` export from `tests/lib/helpers.ts` (dead code never imported by any test file).
+- [Support Library] `parseRequest` and `parseTestRequest` non-`Error` catch branches now covered — paths that throw `InvalidRequest` / `InternalFailure` with `'Unknown error parsing event'` / `'Unknown error parsing request'` when a non-Error value is thrown inside the try block.
+- [Support Library] Prettier formatting corrected in `tests/lib/codegen.test.ts` and `tests/lib/log-delivery.test.ts`.
+- [CLI Plugin] Test coverage for `codegen.py` raised from 97% to **100%**: added tests for `_load_support_lib_version` OSError fallback, `generate()` with `configuration_schema`, `_recursive_relative_write` directory-entry skip branch, `_make_build_command` default path, `_validate_build_prerequisites` `CalledProcessError` and unparseable-version-string paths.
+
 ### Changed
 - [Support Library] Enable `strictNullChecks: true` across the entire codebase. Null/undefined handling is now fully type-safe throughout `src/` and `tests/lib/`.
 - [CLI Plugin] `SUPPORT_LIB_VERSION` is now read dynamically from `data/support-lib-version.txt` instead of being hardcoded in `codegen.py`. The existing CI sync-test also validates the data file.

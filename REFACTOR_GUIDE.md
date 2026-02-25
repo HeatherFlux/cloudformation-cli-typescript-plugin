@@ -38,6 +38,7 @@ DEP-04 (EVALUATED: only one version of @org-formation/tombok exists; part of pub
 ### ✅ Completed (this branch, continued)
 PY-04 (SUPPORT_LIB_VERSION: read dynamically from `python/rpdk/typescript/data/support-lib-version.txt`; CI sync-test validates the file)
 LOG-TYPES (Logger.log / private log methods: `any` → `unknown` throughout log-delivery.ts, metrics.ts, resource.ts; Queue<void> explicit type)
+COV-FINAL (Coverage push: 279 TS tests 99.72% stmts; 110 Python tests 100%; dead code removed; parseRequest/parseTestRequest non-Error branches covered)
 
 ### 🔬 Investigated — Do NOT Implement
 INC-04 — ❌ DO NOT implement — reflect-metadata removal is unsafe
