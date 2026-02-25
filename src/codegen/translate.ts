@@ -84,7 +84,9 @@ function collectInner(resolved: ResolvedType, classes: string[]): InnerType {
             const type = resolved.type as string;
             return {
                 type,
-                wrapperType: PRIMITIVE_WRAPPERS[type] ?? 'Object',
+                // All types returned by resolveProperty() are in PRIMITIVE_WRAPPERS.
+            // The 'Object' fallback is a defensive guard for unknown future types.
+            wrapperType: PRIMITIVE_WRAPPERS[type] ?? 'Object',
                 classes,
                 primitive: true,
             };

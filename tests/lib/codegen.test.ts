@@ -156,6 +156,34 @@ describe('resolveModels', () => {
         expect(Object.keys(models)).not.toContain('ResourceModel');
     });
 
+    test('type as array ["string"] resolves to primitive string (line 104 branch)', () => {
+        // JSON Schema allows type to be an array, e.g. ["string", "null"]
+        // CloudFormation schemas occasionally use this; we take the first element.
+        const schema: CfnResourceSchema = {
+            typeName: 'A::B::C',
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+            properties: { Name: { type: ['string'] as any } },
+        };
+        const models = resolveModels(schema);
+        expect(models.ResourceModel.Name).toEqual({ container: 'primitive', type: 'string' });
+    });
+
+    test('$ref to definition with array type inlines as primitive (lines 74+93 branches)', () => {
+        // definition has type: ["string"] — isPrimitiveDefinition must handle Array.isArray
+        const schema: CfnResourceSchema = {
+            typeName: 'A::B::C',
+            properties: { Name: { $ref: '#/definitions/NameString' } },
+            definitions: {
+                // eslint-disable-next-line @typescript-eslint/no-explicit-any
+                NameString: { type: ['string'] as any },
+            },
+        };
+        const models = resolveModels(schema);
+        // NameString is a primitive alias (array type) — should inline as primitive string
+        expect(models.ResourceModel.Name).toEqual({ container: 'primitive', type: 'string' });
+        expect(Object.keys(models)).not.toContain('NameString');
+    });
+
     test('bare object type without additionalProperties resolves to opaque object', () => {
         // Exercises the fallback branch at resolver.ts:131
         const schema: CfnResourceSchema = {

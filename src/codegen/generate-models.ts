@@ -186,12 +186,22 @@ function generateIdentifierGetter(identifiers: string[]): string {
 // Class generation
 // ---------------------------------------------------------------------------
 
+/**
+ * Internal options type that guarantees `primaryIdentifier` and
+ * `additionalIdentifiers` are present (they have already been defaulted to `[]`
+ * by `generateModels` before this function is called).
+ */
+type ResolvedGenerateOptions = GenerateModelsOptions & {
+    primaryIdentifier: string[];
+    additionalIdentifiers: string[][];
+};
+
 function generateModelClass(
     modelName: string,
     properties: Record<string, ResolvedType>,
-    options: GenerateModelsOptions
+    options: ResolvedGenerateOptions
 ): string {
-    const { typeName, primaryIdentifier = [], additionalIdentifiers = [] } = options;
+    const { typeName, primaryIdentifier, additionalIdentifiers } = options;
 
     const isRoot = modelName === 'ResourceModel';
     const lines: string[] = [];
