@@ -1,4 +1,4 @@
-import { Integer, UnmodeledRequest } from '~/interface';
+import { BaseDto, BaseModel, BaseResourceHandlerRequest, Integer, UnmodeledRequest } from '~/interface';
 import { SerializableModel } from '../data/sample-model';
 
 describe('when getting interface', () => {
@@ -65,6 +65,31 @@ describe('when getting interface', () => {
         const serialized = model!.serialize();
         expect(typeof serialized['SomeInt']).toBe('number');
         expect(serialized['SomeInt']).toBe(35190274);
+    });
+
+    test('BaseModel constructor with truthy partial assigns properties', () => {
+        class ConcreteModel extends BaseModel {}
+        const model = new ConcreteModel({ someField: 'value' });
+        expect((model as unknown as Record<string, unknown>)['someField']).toBe('value');
+    });
+
+    test('BaseDto constructor with null partial does not assign (falsy non-undefined)', () => {
+        const req = new BaseResourceHandlerRequest(null);
+        // null passes the !== undefined check but is falsy, so Object.assign is skipped
+        expect(req).toBeInstanceOf(BaseResourceHandlerRequest);
+        expect(req.awsAccountId).toBeUndefined();
+    });
+
+    test('BaseDto constructor with truthy partial assigns properties', () => {
+        // Minimal concrete subclass with no @Expose() class fields of its own so
+        // useDefineForClassFields does not clobber the Object.assign in super().
+        class MinimalDto extends BaseDto {
+            constructor(partial?: unknown) {
+                super(partial);
+            }
+        }
+        const dto = new MinimalDto({ dynamicProp: 'hello' });
+        expect((dto as unknown as Record<string, unknown>)['dynamicProp']).toBe('hello');
     });
 
     test('unmodeled request partion', () => {
