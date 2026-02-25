@@ -165,7 +165,10 @@ describe('resolveModels', () => {
             properties: { Name: { type: ['string'] as any } },
         };
         const models = resolveModels(schema);
-        expect(models.ResourceModel.Name).toEqual({ container: 'primitive', type: 'string' });
+        expect(models.ResourceModel.Name).toEqual({
+            container: 'primitive',
+            type: 'string',
+        });
     });
 
     test('$ref to definition with array type inlines as primitive (lines 74+93 branches)', () => {
@@ -180,7 +183,10 @@ describe('resolveModels', () => {
         };
         const models = resolveModels(schema);
         // NameString is a primitive alias (array type) — should inline as primitive string
-        expect(models.ResourceModel.Name).toEqual({ container: 'primitive', type: 'string' });
+        expect(models.ResourceModel.Name).toEqual({
+            container: 'primitive',
+            type: 'string',
+        });
         expect(Object.keys(models)).not.toContain('NameString');
     });
 
@@ -605,7 +611,9 @@ describe('generateModelsFromSchema (missing schema fields)', () => {
         );
         const source = generateModelsFromSchema(schema, LIB_NAME, extraModels);
         expect(source).toContain('export class ResourceModel extends BaseModel');
-        expect(source).toContain('export class TypeConfigurationModel extends BaseModel');
+        expect(source).toContain(
+            'export class TypeConfigurationModel extends BaseModel'
+        );
     });
 });
 
