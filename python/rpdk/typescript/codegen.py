@@ -14,10 +14,7 @@ from rpdk.core.plugin_base import LanguagePlugin
 from .resolver import contains_model, get_inner_type, translate_type
 from .utils import safe_reserved
 
-if sys.version_info >= (3, 8):  # pragma: no cover
-    from zipfile import ZipFile
-else:  # pragma: no cover
-    from zipfile38 import ZipFile
+from zipfile import ZipFile
 
 
 LOG = logging.getLogger(__name__)
@@ -26,7 +23,7 @@ EXECUTABLE = "cfn"
 SUPPORT_LIB_NAME = (
     "@amazon-web-services-cloudformation/cloudformation-cli-typescript-lib"
 )
-SUPPORT_LIB_VERSION = "^1.0.6"
+SUPPORT_LIB_VERSION = "^2.0.0"
 MAIN_HANDLER_FUNCTION = "TypeFunction"
 
 
@@ -98,6 +95,8 @@ class TypescriptLanguagePlugin(LanguagePlugin):
         project.settings["use_docker"] = self._use_docker
         project.settings["no_docker"] = self._no_docker
         project.settings["protocolVersion"] = self._protocol_version
+        # Remove legacy camelCase key so .rpdk-config doesn't accumulate stale entries
+        project.settings.pop("useDocker", None)
 
     def init(self, project):
         LOG.debug("Init started")
@@ -264,8 +263,65 @@ class TypescriptLanguagePlugin(LanguagePlugin):
             command = build_command
         return command
 
+    def _validate_build_prerequisites(self):
+        """Raise DownstreamError if required build tools are not available.
+
+        Always validates:
+            - ``npm`` (required for ``npm install``)
+            - ``node`` (required; must be >= 20)
+
+        Conditionally validates:
+            - ``sam`` (only when using the default build command; a custom
+              ``buildCommand`` may not invoke SAM at all)
+        """
+        if not shutil.which("npm"):
+            raise DownstreamError(
+                "npm is not installed or not on PATH. "
+                "Install Node.js and npm >= 10 from https://nodejs.org/."
+            )
+
+        if not shutil.which("node"):
+            raise DownstreamError(
+                "node is not installed or not on PATH. "
+                "Install Node.js >= 20 from https://nodejs.org/."
+            )
+
+        try:
+            result = subprocess_run(  # nosec
+                ["node", "--version"],
+                stdout=PIPE,
+                stderr=PIPE,
+                check=True,
+                universal_newlines=True,
+            )
+            version_str = result.stdout.strip().lstrip("v")
+            major = int(version_str.split(".")[0])
+            if major < 20:
+                raise DownstreamError(
+                    f"Node.js >= 20 is required, but {result.stdout.strip()} was found. "
+                    "Install a newer version from https://nodejs.org/."
+                )
+        except CalledProcessError as e:
+            raise DownstreamError("Failed to determine Node.js version.") from e
+        except ValueError:
+            LOG.warning(
+                "Could not parse Node.js version; skipping minimum-version check."
+            )
+
+        # Only require SAM when using the default build command; custom commands
+        # may not invoke SAM at all.
+        if self._build_command is None and not shutil.which("sam"):
+            raise DownstreamError(
+                "AWS SAM CLI is not installed or not on PATH. "
+                "Install it from https://docs.aws.amazon.com/serverless-application-model/"
+                "latest/developerguide/install-sam-cli.html, "
+                "or set a custom 'buildCommand' in .rpdk-config to skip SAM."
+            )
+
     def _build(self, base_path):
         LOG.debug("Dependencies build started from '%s'", base_path)
+
+        self._validate_build_prerequisites()
 
         # TODO: We should use the build logic from SAM CLI library, instead:
         # https://github.com/awslabs/aws-sam-cli/blob/master/samcli/lib/build/app_builder.py

@@ -16,10 +16,7 @@ from rpdk.typescript.codegen import (
     validate_no,
 )
 
-if sys.version_info >= (3, 8):  # pragma: no cover
-    from zipfile import ZipFile
-else:  # pragma: no cover
-    from zipfile38 import ZipFile
+from zipfile import ZipFile
 
 
 TYPE_NAME = "foo::bar::baz"
@@ -236,10 +233,13 @@ def test_package_local(project: Project):
     zip_path = project.root / "foo-bar-baz.zip"
 
     # pylint: disable=unexpected-keyword-arg
+    # Mock _build so we don't need a real npm/sam installation; the test
+    # focuses on zip layout, not on the build subprocess.
     with zip_path.open("wb") as f, ZipFile(
         f, mode="w", strict_timestamps=False
     ) as zip_file:
-        project._plugin.package(project, zip_file)
+        with patch.object(TypescriptLanguagePlugin, "_build"):
+            project._plugin.package(project, zip_file)
 
     with zip_path.open("rb") as f, ZipFile(
         f, mode="r", strict_timestamps=False
@@ -255,7 +255,8 @@ def test__build_called_process_error(plugin: TypescriptLanguagePlugin, tmp_path:
     executable_name = str(uuid4())
     plugin._build_command = executable_name
 
-    with patch.object(
+    patch_validate = patch.object(plugin, "_validate_build_prerequisites")
+    with patch_validate, patch.object(
         TypescriptLanguagePlugin,
         "_make_build_command",
         wraps=TypescriptLanguagePlugin._make_build_command,
@@ -277,7 +278,9 @@ def test__build_docker(plugin: TypescriptLanguagePlugin):
     patch_subprocess_run = patch(
         "rpdk.typescript.codegen.subprocess_run", autospec=True
     )
-    with patch_cmd as mock_cmd, patch_subprocess_run as mock_subprocess_run:
+    # Bypass prerequisite checks — tested separately in test_validate_prerequisites_*
+    patch_validate = patch.object(plugin, "_validate_build_prerequisites")
+    with patch_cmd as mock_cmd, patch_subprocess_run as mock_subprocess_run, patch_validate:
         plugin._build(sentinel.base_path)
 
     mock_cmd.assert_called_once_with(sentinel.base_path, None)
@@ -300,3 +303,150 @@ def test__build_docker(plugin: TypescriptLanguagePlugin):
             shell=True,
             universal_newlines=True,
         )
+
+
+def test_init_settings_removes_legacy_use_docker_key():
+    """Ensure the legacy 'useDocker' key is cleaned up from .rpdk-config settings."""
+    plugin = TypescriptLanguagePlugin()
+    settings = {"useDocker": True, "use_docker": True, "no_docker": False}
+
+    class FakeProject:
+        settings = {}
+
+    project = FakeProject()
+    project.settings = dict(settings)
+    plugin._use_docker = True
+    plugin._no_docker = False
+    plugin._protocol_version = "2.0.0"
+    plugin._init_settings(project)
+
+    assert "useDocker" not in project.settings
+    assert project.settings["use_docker"] is True
+
+
+def test_support_lib_version_matches_package_json():
+    """Ensure SUPPORT_LIB_VERSION in codegen.py stays in sync with package.json."""
+    import json
+    from pathlib import Path
+    from rpdk.typescript.codegen import SUPPORT_LIB_VERSION
+
+    repo_root = Path(__file__).parent.parent.parent
+    pkg = json.loads((repo_root / "package.json").read_text())
+    expected = f"^{pkg['version']}"
+    assert SUPPORT_LIB_VERSION == expected, (
+        f"SUPPORT_LIB_VERSION ({SUPPORT_LIB_VERSION!r}) does not match "
+        f"package.json version ({pkg['version']!r}). "
+        "Update python/rpdk/typescript/codegen.py when bumping the npm version."
+    )
+
+
+# ---------------------------------------------------------------------------
+# PY-03 — prerequisite validation tests
+# ---------------------------------------------------------------------------
+
+
+def test_validate_prerequisites_npm_missing(plugin: TypescriptLanguagePlugin):
+    """DownstreamError raised when npm is not on PATH."""
+    with patch("rpdk.typescript.codegen.shutil.which", return_value=None):
+        with pytest.raises(DownstreamError, match="npm is not installed"):
+            plugin._validate_build_prerequisites()
+
+
+def test_validate_prerequisites_node_missing(plugin: TypescriptLanguagePlugin):
+    """DownstreamError raised when node is not on PATH."""
+
+    def which_side_effect(cmd):
+        return "/usr/bin/npm" if cmd == "npm" else None
+
+    with patch("rpdk.typescript.codegen.shutil.which", side_effect=which_side_effect):
+        with pytest.raises(DownstreamError, match="node is not installed"):
+            plugin._validate_build_prerequisites()
+
+
+def test_validate_prerequisites_node_too_old(plugin: TypescriptLanguagePlugin):
+    """DownstreamError raised when node version is below the minimum (20)."""
+
+    def which_side_effect(cmd):
+        return f"/usr/bin/{cmd}" if cmd in ("npm", "node") else None
+
+    with patch("rpdk.typescript.codegen.shutil.which", side_effect=which_side_effect):
+        with patch(
+            "rpdk.typescript.codegen.subprocess_run",
+            return_value=type(
+                "CP", (), {"stdout": "v18.20.0\n", "returncode": 0}
+            )(),
+        ):
+            with pytest.raises(DownstreamError, match="Node.js >= 20 is required"):
+                plugin._validate_build_prerequisites()
+
+
+def test_validate_prerequisites_sam_missing_default_command(
+    plugin: TypescriptLanguagePlugin,
+):
+    """DownstreamError raised when sam is missing and no custom buildCommand."""
+    plugin._build_command = None  # use default command → sam required
+
+    def which_side_effect(cmd):
+        return f"/usr/bin/{cmd}" if cmd in ("npm", "node") else None
+
+    with patch("rpdk.typescript.codegen.shutil.which", side_effect=which_side_effect):
+        with patch(
+            "rpdk.typescript.codegen.subprocess_run",
+            return_value=type(
+                "CP", (), {"stdout": "v20.10.0\n", "returncode": 0}
+            )(),
+        ):
+            with pytest.raises(DownstreamError, match="AWS SAM CLI is not installed"):
+                plugin._validate_build_prerequisites()
+
+
+def test_validate_prerequisites_sam_not_required_with_custom_command(
+    plugin: TypescriptLanguagePlugin,
+):
+    """No error raised for missing sam when a custom buildCommand is set."""
+    plugin._build_command = "echo 'custom build'"  # custom → sam not required
+
+    def which_side_effect(cmd):
+        return f"/usr/bin/{cmd}" if cmd in ("npm", "node") else None
+
+    with patch("rpdk.typescript.codegen.shutil.which", side_effect=which_side_effect):
+        with patch(
+            "rpdk.typescript.codegen.subprocess_run",
+            return_value=type(
+                "CP", (), {"stdout": "v20.10.0\n", "returncode": 0}
+            )(),
+        ):
+            # Should not raise — custom buildCommand means sam is optional
+            plugin._validate_build_prerequisites()
+
+
+def test_validate_prerequisites_all_present(plugin: TypescriptLanguagePlugin):
+    """No error raised when all prerequisites are available."""
+    plugin._build_command = None
+
+    with patch(
+        "rpdk.typescript.codegen.shutil.which", return_value="/usr/bin/tool"
+    ):
+        with patch(
+            "rpdk.typescript.codegen.subprocess_run",
+            return_value=type(
+                "CP", (), {"stdout": "v20.10.0\n", "returncode": 0}
+            )(),
+        ):
+            plugin._validate_build_prerequisites()  # should not raise
+
+
+def test__build_validates_prerequisites(plugin: TypescriptLanguagePlugin, tmp_path):
+    """_build() calls _validate_build_prerequisites() before running subprocess."""
+    with patch.object(
+        plugin, "_validate_build_prerequisites"
+    ) as mock_validate, patch.object(
+        TypescriptLanguagePlugin,
+        "_make_build_command",
+        return_value="",
+    ), patch(
+        "rpdk.typescript.codegen.subprocess_run", autospec=True
+    ):
+        plugin._build(tmp_path)
+
+    mock_validate.assert_called_once()
