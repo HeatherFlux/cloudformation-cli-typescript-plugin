@@ -17,10 +17,13 @@ type LogicalResourceId = string;
 export type NextToken = string;
 
 export type Optional<T> = T | undefined | null;
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
 export type Dict<T = any> = Record<string, T>;
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
 export type Constructor<T = object> = new (...args: any[]) => T;
 export type integer = bigint;
 
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
 export interface Callable<R extends Array<any>, T> {
     (...args: R): T;
 }

@@ -8,6 +8,7 @@ type primitive = string | number | boolean | bigint | integer | object | null;
  * the types defined in the model class
  */
 export const recastPrimitive = (
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     cls: Callable<any, primitive>,
     k: string,
     v: string
@@ -39,6 +40,9 @@ export const recastPrimitive = (
     return (cls(v) as NonNullable<primitive>).valueOf() as primitive;
 };
 
+/* eslint-disable @typescript-eslint/no-explicit-any */
+// transformValue works with arbitrary CloudFormation class constructors and runtime values;
+// the `any` types here are intentional and cannot be eliminated without losing type safety.
 export const transformValue = (
     cls: any,
     key: string,
@@ -97,3 +101,4 @@ export const transformValue = (
         }
     }
 };
+/* eslint-enable @typescript-eslint/no-explicit-any */

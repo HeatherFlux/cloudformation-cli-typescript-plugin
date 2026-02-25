@@ -1,11 +1,11 @@
 import { EventEmitter } from 'events';
 
-type PromiseFunction = () => Promise<any>;
+type PromiseFunction<T = unknown> = () => Promise<T>;
 
-interface QueueItem {
-    promise: PromiseFunction;
-    reject: (value: any) => void;
-    resolve: (reason: any) => void;
+interface QueueItem<T = unknown> {
+    promise: PromiseFunction<T>;
+    reject: (reason?: unknown) => void;
+    resolve: (value: T | PromiseLike<T>) => void;
 }
 
 /**
@@ -107,12 +107,12 @@ export class ProgressTracker extends EventEmitter {
     }
 }
 
-export class Queue {
-    #queue: QueueItem[] = [];
+export class Queue<T = unknown> {
+    #queue: Array<QueueItem<T>> = [];
     #pendingPromise = false;
 
-    public enqueue(promise: PromiseFunction): Promise<any> {
-        return new Promise((resolve, reject) => {
+    public enqueue(promise: PromiseFunction<T>): Promise<T> {
+        return new Promise<T>((resolve, reject) => {
             this.#queue.push({
                 promise,
                 resolve,
@@ -178,9 +178,11 @@ export function replaceAll(
  * @returns Initial object with frozen properties applied on it
  */
 export function deepFreeze(
-    // eslint-disable-next-line @typescript-eslint/ban-types
+    // Accepts arbitrary objects, arrays, and callables — any[] is intentional here.
+    // eslint-disable-next-line @typescript-eslint/ban-types, @typescript-eslint/no-explicit-any
     obj: Record<string, any> | Array<any> | Function,
     processed = new Set()
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
 ): Record<string, any> {
     if (
         // Prevent circular reference
@@ -206,6 +208,8 @@ export function deepFreeze(
 
     // Freeze properties before freezing self
     for (const name of propNames) {
+        // Dynamic property access by string|symbol|number key — any cast is unavoidable.
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
         const value = obj[name as any];
 
         deepFreeze(value, processed);

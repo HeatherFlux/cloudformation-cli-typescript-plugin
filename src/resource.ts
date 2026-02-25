@@ -49,7 +49,13 @@ export type HandlerSignature<
     T extends BaseModel,
     TypeConfiguration extends BaseModel,
 > = Callable<
-    [Optional<SessionProxy>, any, Dict, LoggerProxy, TypeConfiguration | undefined],
+    [
+        Optional<SessionProxy>,
+        BaseResourceHandlerRequest<T>,
+        Dict,
+        LoggerProxy,
+        TypeConfiguration | undefined,
+    ],
     Promise<ProgressEvent<T>>
 >;
 export class HandlerSignatures<
@@ -142,6 +148,8 @@ export abstract class BaseResource<
         const actions: HandlerEvents =
             Reflect.getMetadata('handlerEvents', this) || new HandlerEvents();
         actions.forEach((value: string | symbol, key: Action) => {
+            // Reflect.getMetadata returns a string|symbol key into `this`; no typed alternative.
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
             this.addHandler(key, (this as any)[value]);
         });
     }
@@ -297,7 +305,7 @@ export abstract class BaseResource<
      * @param message The primary message.
      * @param optionalParams All additional parameters used as substitution values.
      */
-    private log(message?: any, ...optionalParams: any[]): void {
+    private log(message?: unknown, ...optionalParams: unknown[]): void {
         if (this.loggerProxy) {
             this.loggerProxy.markPending();
             this.loggerProxy.log(message, ...optionalParams);

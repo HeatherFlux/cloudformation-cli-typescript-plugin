@@ -58,9 +58,11 @@ module.exports = {
         },
         {
             // Test files routinely use empty stub implementations and jest.spyOn<any,any>
+            // for private method spying, null-as-any coercions, and other testing patterns.
             files: ['tests/**/*.ts'],
             rules: {
                 '@typescript-eslint/no-empty-function': 'off',
+                '@typescript-eslint/no-explicit-any': 'off',
             },
         },
     ],
