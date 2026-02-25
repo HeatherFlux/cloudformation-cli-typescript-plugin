@@ -468,3 +468,102 @@ def test__build_validates_prerequisites(plugin: TypescriptLanguagePlugin, tmp_pa
         plugin._build(tmp_path)
 
     mock_validate.assert_called_once()
+
+
+# ---------------------------------------------------------------------------
+# Additional coverage tests
+# ---------------------------------------------------------------------------
+
+
+def test_load_support_lib_version_oserror_fallback():
+    """_load_support_lib_version falls back to '^2.0.0' when file is unreadable."""
+    from rpdk.typescript.codegen import _load_support_lib_version
+
+    with patch("builtins.open", side_effect=OSError("no such file")):
+        with patch("rpdk.typescript.codegen.LOG") as mock_log:
+            version = _load_support_lib_version()
+
+    assert version == "^2.0.0"
+    mock_log.warning.assert_called_once()
+
+
+def test_generate_with_configuration_schema(project: Project):
+    """generate() resolves TypeConfigurationModel from project.configuration_schema."""
+    project.load_schema()
+    # Inject a minimal configuration_schema so the `if project.configuration_schema:`
+    # branch (codegen.py:217) is taken.
+    project.configuration_schema = {
+        "properties": {"Endpoint": {"type": "string"}},
+        "additionalProperties": False,
+    }
+    project.generate()
+    models_ts = (project.root / "src" / "models.ts").read_text()
+    # The generated file must declare a TypeConfigurationModel with the Endpoint field.
+    assert "TypeConfigurationModel" in models_ts
+    assert "Endpoint" in models_ts
+
+
+def test_recursive_relative_write_skips_directories(tmp_path):
+    """_recursive_relative_write skips directory entries (codegen.py:257->256 branch)."""
+    from zipfile import ZipFile
+    from io import BytesIO
+    from unittest.mock import MagicMock
+
+    # Create a source tree: src_path/subdir/ and src_path/file.txt
+    src_path = tmp_path / "src"
+    src_path.mkdir()
+    sub_dir = src_path / "subdir"
+    sub_dir.mkdir()
+    (src_path / "file.txt").write_text("hello")
+
+    buf = BytesIO()
+    with ZipFile(buf, "w") as zf:
+        TypescriptLanguagePlugin._recursive_relative_write(src_path, tmp_path, zf)
+        names = zf.namelist()
+
+    # Directories should not appear — only the file
+    assert any("file.txt" in n for n in names)
+    assert not any(n.endswith("/") for n in names)
+
+
+def test_make_build_command_default():
+    """_make_build_command without build_command returns default npm+sam command."""
+    cmd = TypescriptLanguagePlugin._make_build_command("/base", build_command=None)
+    assert "npm install" in cmd
+    assert "sam build" in cmd
+
+
+def test_validate_prerequisites_node_called_process_error(
+    plugin: TypescriptLanguagePlugin,
+):
+    """DownstreamError raised when `node --version` subprocess call fails."""
+
+    def which_side_effect(cmd):
+        return f"/usr/bin/{cmd}" if cmd in ("npm", "node") else None
+
+    with patch("rpdk.typescript.codegen.shutil.which", side_effect=which_side_effect):
+        with patch(
+            "rpdk.typescript.codegen.subprocess_run",
+            side_effect=CalledProcessError(1, "node"),
+        ):
+            with pytest.raises(DownstreamError, match="Failed to determine Node.js version"):
+                plugin._validate_build_prerequisites()
+
+
+def test_validate_prerequisites_node_version_unparseable(
+    plugin: TypescriptLanguagePlugin,
+):
+    """Unparseable node version string is warned about but does not raise."""
+
+    def which_side_effect(cmd):
+        return f"/usr/bin/{cmd}" if cmd in ("npm", "node", "sam") else None
+
+    with patch("rpdk.typescript.codegen.shutil.which", side_effect=which_side_effect):
+        with patch(
+            "rpdk.typescript.codegen.subprocess_run",
+            return_value=type("CP", (), {"stdout": "not-a-version\n", "returncode": 0})(),
+        ):
+            with patch("rpdk.typescript.codegen.LOG") as mock_log:
+                plugin._validate_build_prerequisites()  # should not raise
+
+    mock_log.warning.assert_called_once()
