@@ -5,18 +5,20 @@
  * models.ts generation, handlers.ts generation, and scaffold file generation.
  */
 
-import type { CfnResourceSchema } from '~/codegen/schema';
-import { resolveModels } from '~/codegen/resolver';
-import { translateType, getInnerType, containsModel } from '~/codegen/translate';
+// Import everything through the public barrel so index.ts re-exports are exercised.
+import type { CfnResourceSchema } from '~/codegen';
 import {
+    resolveModels,
+    translateType,
+    getInnerType,
+    containsModel,
     safeReserved,
     lowercaseFirst,
     uppercaseFirst,
     tsPropName,
-} from '~/codegen/utils';
-import { generateModels, generateModelsFromSchema } from '~/codegen/generate-models';
-import { generateHandlers } from '~/codegen/generate-handlers';
-import {
+    generateModels,
+    generateModelsFromSchema,
+    generateHandlers,
     generateGitignore,
     generateMakefile,
     generateNpmrc,
@@ -25,7 +27,7 @@ import {
     generateSamTemplate,
     generateSamTestCreate,
     generateTsConfig,
-} from '~/codegen/generate-scaffold';
+} from '~/codegen';
 
 // ---------------------------------------------------------------------------
 // Fixtures
@@ -331,12 +333,23 @@ describe('getInnerType', () => {
         expect(inner.primitive).toBe(false);
     });
 
-    test('opaque object type uses Object wrapper (exercises ?? fallback in translate.ts)', () => {
-        // The type 'object' is not in PRIMITIVE_WRAPPERS, so ?? 'Object' is used
+    test('opaque object type uses Object wrapper', () => {
+        // 'object' IS in PRIMITIVE_WRAPPERS → left side of ?? is 'Object' (non-null)
         const inner = getInnerType({ container: 'primitive', type: 'object' });
         expect(inner.type).toBe('object');
         expect(inner.wrapperType).toBe('Object');
         expect(inner.primitive).toBe(true);
+    });
+
+    test('unknown primitive type falls back to Object via ?? (translate.ts:89 right branch)', () => {
+        // A type string not in PRIMITIVE_WRAPPERS returns undefined from the lookup,
+        // triggering the ?? 'Object' right-side fallback.
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const inner = getInnerType({
+            container: 'primitive',
+            type: 'unknownFutureType' as any,
+        });
+        expect(inner.wrapperType).toBe('Object');
     });
 });
 

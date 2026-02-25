@@ -18,20 +18,6 @@ import type {
 import type { BaseResource } from '~/resource';
 
 /**
- * Creates a Jest mock that resolves to `output` when called via `.send()`,
- * matching the AWS SDK v3 client pattern.
- *
- * @example
- * ```typescript
- * const mockSend = mockSendResult({ logStreams: [] });
- * (CloudWatchLogsClient as jest.Mock).mockImplementation(() => ({ send: mockSend }));
- * ```
- */
-export const mockSendResult = (output: any): jest.Mock => {
-    return jest.fn().mockResolvedValue(output);
-};
-
-/**
  * Typed view of the protected internals of `BaseResource`, used in tests
  * instead of untyped bracket notation (`resource['field']`).
  *

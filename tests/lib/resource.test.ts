@@ -8,6 +8,7 @@ import {
     HandlerErrorCode,
     HandlerRequest,
     OperationStatus,
+    TestEvent,
 } from '~/interface';
 import {
     CloudWatchLogHelper,
@@ -458,6 +459,26 @@ describe('when getting resource', () => {
         expect(parseRequest).toThrow(/missing.+awsAccountId/i);
     });
 
+    test('parse request throws InvalidRequest when non-Error is caught (resource.ts:486)', () => {
+        // Throw a non-Error (string) from HandlerRequest.deserialize to cover the
+        // `!(err instanceof Error)` branch that reaches line 486.
+        const spyDeserialize = jest
+            .spyOn(HandlerRequest, 'deserialize')
+            .mockImplementation(() => {
+                // eslint-disable-next-line @typescript-eslint/only-throw-error
+                throw 'non-error-string';
+            });
+        let caughtError: unknown;
+        try {
+            Resource.testParseRequest(entrypointPayload);
+        } catch (err) {
+            caughtError = err;
+        }
+        spyDeserialize.mockRestore();
+        expect(caughtError).toBeInstanceOf(exceptions.InvalidRequest);
+        expect((caughtError as Error).message).toBe('Unknown error parsing event');
+    });
+
     test('parse request with object literal callback context', () => {
         const callbackContext = { a: 'b' };
         entrypointPayload['callbackContext'] = { a: 'b' };
@@ -876,6 +897,27 @@ describe('when getting resource', () => {
         };
         expect(parseTestRequest).toThrow(exceptions.InternalFailure);
         expect(parseTestRequest).toThrow(/missing.+credentials/i);
+    });
+
+    test('parseTestRequest throws InternalFailure when non-Error is caught (resource.ts:403)', () => {
+        // Throw a non-Error from TestEvent.deserialize to cover the
+        // `!(err instanceof Error)` branch that reaches line 403.
+        const spyDeserialize = jest
+            .spyOn(TestEvent, 'deserialize')
+            .mockImplementation(() => {
+                // eslint-disable-next-line @typescript-eslint/only-throw-error
+                throw 'non-error-string';
+            });
+        const resource = getResource();
+        let caughtError: unknown;
+        try {
+            asTestable(resource).parseTestRequest(testEntrypointPayload);
+        } catch (err) {
+            caughtError = err;
+        }
+        spyDeserialize.mockRestore();
+        expect(caughtError).toBeInstanceOf(exceptions.InternalFailure);
+        expect((caughtError as Error).message).toBe('Unknown error parsing request');
     });
 
     test('parse test request with object literal callback context', () => {
