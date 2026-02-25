@@ -116,8 +116,8 @@ export abstract class BaseResource<
     private providerMetricsPublisher: MetricsPublisher;
 
     private cloudWatchLogHelper: CloudWatchLogHelper;
-    private s3LogHelper: S3LogHelper;
-    private providerEventsLogger: CloudWatchLogPublisher | S3LogPublisher | null;
+    protected s3LogHelper: S3LogHelper;
+    protected providerEventsLogger: CloudWatchLogPublisher | S3LogPublisher | null;
 
     private handlers: HandlerSignatures<T, TypeConfiguration>;
 
@@ -276,7 +276,7 @@ export abstract class BaseResource<
     /*
      * null-safe exception metrics delivery
      */
-    private async publishExceptionMetric(action: Action, err: Error): Promise<void> {
+    protected async publishExceptionMetric(action: Action, err: Error): Promise<void> {
         if (this.metricsPublisherProxy) {
             await this.metricsPublisherProxy.publishExceptionMetric(
                 new Date(),
@@ -323,7 +323,7 @@ export abstract class BaseResource<
         return this.handlers.get(action);
     }
 
-    private invokeHandler = async (
+    protected invokeHandler = async (
         session: Optional<SessionProxy>,
         request: BaseResourceHandlerRequest<T>,
         action: Action,
@@ -365,7 +365,7 @@ export abstract class BaseResource<
         return handlerResponse;
     };
 
-    private parseTestRequest = (
+    protected parseTestRequest = (
         eventData: Dict
     ): [BaseResourceHandlerRequest<T>, Action, Dict] => {
         let request: BaseResourceHandlerRequest<T>;
@@ -451,7 +451,7 @@ export abstract class BaseResource<
         return Promise.resolve(progress!);
     }
 
-    private static parseRequest = (
+    protected static parseRequest = (
         eventData: Dict
     ): [[Optional<Credentials>, Credentials], Action, Dict, HandlerRequest] => {
         let callerCredentials: Optional<Credentials>;
@@ -485,7 +485,7 @@ export abstract class BaseResource<
         ];
     };
 
-    private castResourceRequest = (
+    protected castResourceRequest = (
         request: HandlerRequest
     ): BaseResourceHandlerRequest<T> => {
         try {

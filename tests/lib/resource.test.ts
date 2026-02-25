@@ -21,6 +21,7 @@ import { MetricsPublisherProxy } from '~/metrics';
 import { handlerEvent, HandlerSignatures, BaseResource } from '~/resource';
 import { LambdaContext } from '~/interface';
 import { SimpleStateModel } from '../data/sample-model';
+import { asTestable } from './helpers';
 
 // Minimal mock context - all usage in entrypoint/testEntrypoint uses optional chaining
 const MOCK_CTX = {} as LambdaContext;
@@ -36,7 +37,12 @@ describe('when getting resource', () => {
     class MockModel extends SimpleStateModel {
         public static readonly TYPE_NAME: string = TYPE_NAME;
     }
-    class Resource extends BaseResource<MockModel, MockTypeConfigurationModel> {}
+    class Resource extends BaseResource<MockModel, MockTypeConfigurationModel> {
+        /** Expose the protected static parseRequest for test assertions. */
+        public static testParseRequest(eventData: any) {
+            return BaseResource.parseRequest(eventData);
+        }
+    }
 
     class MockTypeConfigurationModel extends BaseModel {
         public static readonly TYPE_NAME: string = TYPE_NAME;
@@ -177,8 +183,13 @@ describe('when getting resource', () => {
             'publishExceptionMetric'
         ).mockImplementation(mockPublishException);
         const mockLog = jest.fn();
-        jest.spyOn(resource['platformLoggerProxy'], 'log').mockImplementation(mockLog);
-        await resource['publishExceptionMetric'](Action.Create, Error('Sorry'));
+        jest.spyOn(asTestable(resource).platformLoggerProxy, 'log').mockImplementation(
+            mockLog
+        );
+        await asTestable(resource).publishExceptionMetric(
+            Action.Create,
+            Error('Sorry')
+        );
         expect(mockPublishException).toBeCalledTimes(0);
         expect(mockLog).toBeCalledTimes(1);
         expect(mockLog).toBeCalledWith('Error: Sorry');
@@ -246,8 +257,14 @@ describe('when getting resource', () => {
             .spyOn<any, any>(CloudWatchLogHelper.prototype, 'prepareLogStream')
             .mockResolvedValue('log-stream-name');
         const mockPublishMessage = jest.fn().mockResolvedValue({});
-        LambdaLogPublisher.prototype['publishMessage'] = mockPublishMessage;
-        CloudWatchLogPublisher.prototype['publishMessage'] = mockPublishMessage;
+        jest.spyOn<any, any>(
+            LambdaLogPublisher.prototype,
+            'publishMessage'
+        ).mockImplementation(mockPublishMessage);
+        jest.spyOn<any, any>(
+            CloudWatchLogPublisher.prototype,
+            'publishMessage'
+        ).mockImplementation(mockPublishMessage);
         const resource = new Resource(
             TYPE_NAME,
             MockModel,
@@ -416,9 +433,13 @@ describe('when getting resource', () => {
                 'arn__aws__cloudformation__us-east-1__123456789012__stack/sample-stack/e722ae60-fe62-11e8-9a0e-0ae8cc519968'
             )
         );
-        expect(resource['providerEventsLogger']).toBeInstanceOf(S3LogPublisher);
-        expect(resource['s3LogHelper']).toBeDefined();
-        expect(resource['s3LogHelper']['bucketName']).toBe(
+        expect(asTestable(resource).providerEventsLogger).toBeInstanceOf(
+            S3LogPublisher
+        );
+        expect(asTestable(resource).s3LogHelper).toBeDefined();
+        // bucketName is private on S3LogHelper — access via any for this implementation-detail assertion
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        expect((asTestable(resource).s3LogHelper as any).bucketName).toBe(
             'provider-logging-group-name-123456789012'
         );
         expect(response).toMatchObject({
@@ -430,7 +451,7 @@ describe('when getting resource', () => {
 
     test('parse request invalid request', () => {
         const parseRequest = () => {
-            Resource['parseRequest']({});
+            Resource.testParseRequest({});
         };
         expect(parseRequest).toThrow(exceptions.InvalidRequest);
         expect(parseRequest).toThrow(/missing.+awsAccountId/i);
@@ -441,7 +462,7 @@ describe('when getting resource', () => {
         entrypointPayload['callbackContext'] = { a: 'b' };
         const resource = getResource();
         const [credentials, action, callback, request] =
-            resource.constructor['parseRequest'](entrypointPayload);
+            Resource.testParseRequest(entrypointPayload);
         expect(credentials).toBeDefined();
         expect(action).toBeDefined();
         expect(callback).toMatchObject(callbackContext);
@@ -453,7 +474,7 @@ describe('when getting resource', () => {
         entrypointPayload['callbackContext'] = callbackContext;
         const resource = getResource();
         const [credentials, action, callback, request] =
-            resource.constructor['parseRequest'](entrypointPayload);
+            Resource.testParseRequest(entrypointPayload);
         expect(credentials).toBeDefined();
         expect(action).toBeDefined();
         expect(callback).toMatchObject(callbackContext);
@@ -467,7 +488,7 @@ describe('when getting resource', () => {
         const resource = getResource();
         const castResourceRequest = () => {
             // eslint-disable-next-line @typescript-eslint/no-explicit-any
-            resource['castResourceRequest'](request as any);
+            asTestable(resource).castResourceRequest(request as any);
         };
         expect(castResourceRequest).toThrow(exceptions.InvalidRequest);
         expect(castResourceRequest).toThrow(
@@ -490,7 +511,7 @@ describe('when getting resource', () => {
         );
 
         const [[callerCredentials, providerCredentials], action, callback, request] =
-            resource.constructor['parseRequest'](entrypointPayload);
+            Resource.testParseRequest(entrypointPayload);
 
         // Credentials are used when rescheduling, so can't zero them out (for now).
         expect(callerCredentials).toBeTruthy();
@@ -499,7 +520,7 @@ describe('when getting resource', () => {
         expect(action).toBe(Action.Create);
         expect(callback).toMatchObject({});
 
-        const modeledRequest = resource['castResourceRequest'](request);
+        const modeledRequest = asTestable(resource).castResourceRequest(request);
         expect(spyDeserialize).nthCalledWith(1, { state: 'state1' });
         expect(spyDeserialize).nthCalledWith(2, { state: 'state2' });
         expect(modeledRequest).toMatchObject({
@@ -634,13 +655,13 @@ describe('when getting resource', () => {
             null
         );
         let event = await resource.entrypoint(entrypointPayload, lambdaContext);
-        expect(resource['loggerProxy'].logPublisherCount).toBe(1);
+        expect(asTestable(resource).loggerProxy.logPublisherCount).toBe(1);
         expect(event.status).toBe(OperationStatus.Success);
         event = await resource.entrypoint(entrypointPayload, {
             ...lambdaContext,
             awsRequestId: 'd8181a30-302a-11eb-9c27-0aeffe35c30a',
         });
-        expect(resource['loggerProxy'].logPublisherCount).toBe(1);
+        expect(asTestable(resource).loggerProxy.logPublisherCount).toBe(1);
         expect(event.status).toBe(OperationStatus.Success);
         expect(spyInitializeRuntime).toBeCalledTimes(2);
         expect(mockHandler).toBeCalledTimes(2);
@@ -712,7 +733,7 @@ describe('when getting resource', () => {
         const callbackContext = {};
         try {
             // eslint-disable-next-line @typescript-eslint/no-explicit-any
-            await resource['invokeHandler'](
+            await asTestable(resource).invokeHandler(
                 null,
                 null as any,
                 Action.Create,
@@ -735,7 +756,7 @@ describe('when getting resource', () => {
         const request = new BaseResourceHandlerRequest<MockModel>();
         const typeConf = new MockTypeConfigurationModel();
         const callbackContext = {};
-        const response = await resource['invokeHandler'](
+        const response = await asTestable(resource).invokeHandler(
             session,
             request,
             Action.Create,
@@ -766,17 +787,15 @@ describe('when getting resource', () => {
             const callbackContext = {};
             promises.push(
                 // eslint-disable-next-line @typescript-eslint/no-explicit-any
-                resource['invokeHandler'](
-                    null,
-                    null as any,
-                    action,
-                    callbackContext
-                ).catch((e: exceptions.BaseHandlerException) => {
-                    expect(e).toMatchObject({
-                        errorCode: HandlerErrorCode.InternalFailure,
-                        message: 'READ and LIST handlers must return synchronously.',
-                    });
-                })
+                asTestable(resource)
+                    .invokeHandler(null, null as any, action, callbackContext)
+                    .catch((e: exceptions.BaseHandlerException) => {
+                        expect(e).toMatchObject({
+                            errorCode: HandlerErrorCode.InternalFailure,
+                            message:
+                                'READ and LIST handlers must return synchronously.',
+                        });
+                    })
             );
         }
         expect.assertions(promises.length);
@@ -797,7 +816,12 @@ describe('when getting resource', () => {
         request.desiredResourceState.state = 'original-desired-state';
         request.previousResourceState = new MockModel();
         request.awsAccountId = '123456789012';
-        await resource['invokeHandler'](null, request, Action.Create, callbackContext);
+        await asTestable(resource).invokeHandler(
+            null,
+            request,
+            Action.Create,
+            callbackContext
+        );
         const modifyCurrentState = () => {
             request.desiredResourceState!.state = 'another-state';
         };
@@ -833,7 +857,7 @@ describe('when getting resource', () => {
         const callbackContext = {};
         try {
             // eslint-disable-next-line @typescript-eslint/no-explicit-any
-            await resource['invokeHandler'](
+            await asTestable(resource).invokeHandler(
                 null,
                 null as any,
                 Action.Create,
@@ -849,7 +873,7 @@ describe('when getting resource', () => {
     test('parse test request invalid request', () => {
         const resource = getResource();
         const parseTestRequest = () => {
-            resource['parseTestRequest']({});
+            asTestable(resource).parseTestRequest({});
         };
         expect(parseTestRequest).toThrow(exceptions.InternalFailure);
         expect(parseTestRequest).toThrow(/missing.+credentials/i);
@@ -866,7 +890,7 @@ describe('when getting resource', () => {
             MockTypeConfigurationModel
         );
         const [request, action, callback] =
-            resource['parseTestRequest'](testEntrypointPayload);
+            asTestable(resource).parseTestRequest(testEntrypointPayload);
         expect(action).toBeDefined();
         expect(callback).toMatchObject(callbackContext);
         expect(request).toBeDefined();
@@ -883,7 +907,7 @@ describe('when getting resource', () => {
             MockTypeConfigurationModel
         );
         const [request, action, callback] =
-            resource['parseTestRequest'](testEntrypointPayload);
+            asTestable(resource).parseTestRequest(testEntrypointPayload);
         expect(action).toBeDefined();
         expect(callback).toMatchObject(callbackContext);
         expect(request).toBeDefined();
@@ -899,7 +923,7 @@ describe('when getting resource', () => {
         );
         resource.addHandler(Action.Create, jest.fn());
         const [request, action, callback] =
-            resource['parseTestRequest'](testEntrypointPayload);
+            asTestable(resource).parseTestRequest(testEntrypointPayload);
 
         expect(request).toMatchObject({
             clientRequestToken: 'ecba020e-b2e6-4742-a7d0-8a06ae7c4b2b',
