@@ -465,7 +465,7 @@ describe('when getting resource', () => {
         const spyDeserialize = jest
             .spyOn(HandlerRequest, 'deserialize')
             .mockImplementation(() => {
-                // eslint-disable-next-line @typescript-eslint/only-throw-error
+                // eslint-disable-next-line @typescript-eslint/no-throw-literal
                 throw 'non-error-string';
             });
         let caughtError: unknown;
@@ -905,7 +905,7 @@ describe('when getting resource', () => {
         const spyDeserialize = jest
             .spyOn(TestEvent, 'deserialize')
             .mockImplementation(() => {
-                // eslint-disable-next-line @typescript-eslint/only-throw-error
+                // eslint-disable-next-line @typescript-eslint/no-throw-literal
                 throw 'non-error-string';
             });
         const resource = getResource();
