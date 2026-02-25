@@ -189,7 +189,10 @@ export class ProgressEvent<
      * @param ctx   - Optional callback context persisted between invocations
      */
     @Exclude()
-    public static progress<T extends ProgressEvent>(model?: any, ctx?: any): T {
+    public static progress<T extends ProgressEvent>(
+        model?: BaseModel | null,
+        ctx?: Dict | null
+    ): T {
         const progress = ProgressEvent.builder<T>()!.status(OperationStatus.InProgress);
         if (ctx) {
             progress.callbackContext(ctx);
@@ -208,7 +211,10 @@ export class ProgressEvent<
      * @param ctx   - Optional callback context (rarely needed for terminal events)
      */
     @Exclude()
-    public static success<T extends ProgressEvent>(model?: any, ctx?: any): T {
+    public static success<T extends ProgressEvent>(
+        model?: BaseModel | null,
+        ctx?: Dict | null
+    ): T {
         const event = ProgressEvent.progress<T>(model, ctx);
         event.status = OperationStatus.Success;
         return event;

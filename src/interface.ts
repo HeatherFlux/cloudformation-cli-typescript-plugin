@@ -18,7 +18,7 @@ export type NextToken = string;
 
 export type Optional<T> = T | undefined | null;
 export type Dict<T = any> = Record<string, T>;
-export type Constructor<T = {}> = new (...args: any[]) => T;
+export type Constructor<T = object> = new (...args: any[]) => T;
 export type integer = bigint;
 
 export interface Callable<R extends Array<any>, T> {

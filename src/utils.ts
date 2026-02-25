@@ -1,6 +1,4 @@
 import { EventEmitter } from 'events';
-// eslint-disable-next-line
-const replaceAllShim = require('string.prototype.replaceall');
 
 type PromiseFunction = () => Promise<any>;
 
@@ -33,7 +31,6 @@ export class ProgressTracker extends EventEmitter {
         super();
         this.restart();
         this.on('include', (kind: string) => {
-            // console.debug(`Progress type being included [${kind}]`, this.message);
             if (kind !== 'submitted' && this.isFinished) {
                 process.nextTick(() => this.emit('finished'));
             }
@@ -61,7 +58,7 @@ export class ProgressTracker extends EventEmitter {
 
     addSubmitted(): void {
         if (this.isFinished) {
-            throw Error(
+            throw new Error(
                 'Not allowed to submit a new task after progress tracker has been closed.'
             );
         }
@@ -90,7 +87,10 @@ export class ProgressTracker extends EventEmitter {
     get message(): string {
         return (
             `${this.#tasksCompleted} of ${this.#tasksSubmitted} completed` +
-            ` ${((this.#tasksCompleted / this.#tasksSubmitted) * 100).toFixed(2)}%` +
+            ` ${(this.#tasksSubmitted > 0
+                ? (this.#tasksCompleted / this.#tasksSubmitted) * 100
+                : 0
+            ).toFixed(2)}%` +
             ` [${this.#tasksFailed} failed]`
         );
     }
@@ -166,7 +166,7 @@ export function replaceAll(
     newSubstr: string
 ): string {
     if (original) {
-        return replaceAllShim(original, substr, newSubstr);
+        return original.replaceAll(substr, newSubstr);
     }
     return original;
 }
@@ -178,6 +178,7 @@ export function replaceAll(
  * @returns Initial object with frozen properties applied on it
  */
 export function deepFreeze(
+    // eslint-disable-next-line @typescript-eslint/ban-types
     obj: Record<string, any> | Array<any> | Function,
     processed = new Set()
 ): Record<string, any> {

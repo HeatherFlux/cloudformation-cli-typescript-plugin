@@ -65,7 +65,7 @@ class HandlerEvents extends Map<Action, string | symbol> {}
  */
 function ensureSerialize<T extends BaseModel>(toResponse = false): MethodDecorator {
     return function (
-        target: Object,
+        target: object,
         propertyKey: string | symbol,
         descriptor: PropertyDescriptor
     ): PropertyDescriptor {
@@ -77,8 +77,8 @@ function ensureSerialize<T extends BaseModel>(toResponse = false): MethodDecorat
         const originalMethod = descriptor.value;
         // Wrapping the original method with new signature.
         descriptor.value = async function (
-            event: any | Dict,
-            context: any
+            event: Dict,
+            context: LambdaContext
         ): Promise<ProgressEvent<T> | CfnResponse<T>> {
             const progress: ProgressEvent<T> = await originalMethod.apply(this, [
                 event,
@@ -399,7 +399,7 @@ export abstract class BaseResource<
     };
 
     public async testEntrypoint(
-        eventData: any | Dict,
+        eventData: Dict,
         context?: Partial<LambdaContext>
     ): Promise<ProgressEvent<T>>;
     @boundMethod
@@ -534,7 +534,7 @@ export abstract class BaseResource<
     };
 
     public async entrypoint(
-        eventData: any | Dict,
+        eventData: Dict,
         context: LambdaContext
     ): Promise<CfnResponse<T>>;
     @boundMethod
@@ -672,7 +672,7 @@ export abstract class BaseResource<
  */
 export function handlerEvent(action: Action): MethodDecorator {
     return function (
-        target: any,
+        target: object,
         propertyKey: string | symbol,
         descriptor: PropertyDescriptor
     ): PropertyDescriptor {

@@ -4,6 +4,7 @@ import {
     Action,
     BaseModel,
     BaseResourceHandlerRequest,
+    Dict,
     HandlerErrorCode,
     HandlerRequest,
     OperationStatus,
@@ -27,9 +28,9 @@ import { asTestable } from './helpers';
 const MOCK_CTX = {} as LambdaContext;
 
 describe('when getting resource', () => {
-    let entrypointPayload: any;
-    let testEntrypointPayload: any;
-    let lambdaContext: any;
+    let entrypointPayload: Dict;
+    let testEntrypointPayload: Dict;
+    let lambdaContext: LambdaContext;
     let spySession: jest.SpyInstance;
     let spySessionClient: jest.SpyInstance;
     let spyInitializeRuntime: jest.SpyInstance;
@@ -39,7 +40,7 @@ describe('when getting resource', () => {
     }
     class Resource extends BaseResource<MockModel, MockTypeConfigurationModel> {
         /** Expose the protected static parseRequest for test assertions. */
-        public static testParseRequest(eventData: any) {
+        public static testParseRequest(eventData: Dict) {
             return BaseResource.parseRequest(eventData);
         }
     }
