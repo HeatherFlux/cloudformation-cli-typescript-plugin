@@ -1,0 +1,22 @@
+name: Setup Branch Protection
+on:
+  workflow_dispatch:
+    inputs:
+      property_value:
+        description: 'Enable Branch Protection (True/False) Case Sensitive'
+        type: string
+        default: 'True'
+  push:
+    branches:
+      - main
+
+jobs:
+  setup-branch-protection:
+    if: ${{ !github.event.repository.is_template }}
+    uses: helloextend/gha-reusable-workflows/.github/workflows/setup-custom-properties.yml@v13.28.1
+    with:
+      property_name: 'SHOULD_APPLY_BRANCH_PROTECTION'
+      property_value: ${{ inputs.property_value || 'True' }}
+      # properties:
+      #   "[{'property_name': 'SHOULD_APPLY_BRANCH_PROTECTION', 'value': 'True' }]"
+    secrets: inherit

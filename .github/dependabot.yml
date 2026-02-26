@@ -1,0 +1,31 @@
+version: 2
+updates:
+  - package-ecosystem: "npm"
+    directory: "/"
+    ignore:
+      - dependency-name: node
+      - dependency-name: "@types/node"
+    schedule:
+      interval: "daily"
+    registries:
+      - codeartifact
+    # Only allow security updates
+    open-pull-requests-limit: 0
+
+  # Configuration for GitHub Actions
+  - package-ecosystem: "github-actions"
+    directory: "/"
+    schedule:
+      interval: "daily"
+    # Group all GitHub Actions updates into one PR
+    groups:
+      github-actions:
+        patterns:
+          - "*"
+
+registries:
+  codeartifact:
+    type: npm-registry
+    url: https://extend-159581800400.d.codeartifact.us-east-1.amazonaws.com/npm/extend-npm/
+    token: ${{secrets.CODEARTIFACT_AUTH_TOKEN}}
+    replaces-base: true

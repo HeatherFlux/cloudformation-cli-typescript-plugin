@@ -1,0 +1,13 @@
+name: Publish
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - package.json
+
+jobs:
+  publish-on-merge:
+    uses: helloextend/gha-reusable-workflows/.github/workflows/publish-on-merge.yml@v13.28.1
+    
+    secrets: inherit

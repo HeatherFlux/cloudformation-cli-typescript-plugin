@@ -1,0 +1,55 @@
+{
+  "name": "@extend/package-template",
+  "version": "1.0.0",
+  "description": "Template for packages using pnpm, written in TypeScript",
+  "homepage": "https://github.com/helloextend/package-template#readme",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/helloextend/package-template.git"
+  },
+  "engines": {
+    "node": ">=22.0.0"
+  },
+  "type": "module",
+  "license": "UNLICENSED",
+  "types": "./dist/index.d.mts",
+  "scripts": {
+    "build": "tsdown",
+    "format": "prettier --ignore-path .gitignore --write \"**/*.ts\"",
+    "lint": "oxlint .",
+    "prepare": "husky && pnpm build && publint --strict",
+    "test": "vitest run",
+    "test:coverage": "vitest run --coverage",
+    "test:unit:ci": "pnpm build && vitest run --coverage",
+    "typecheck": "NODE_OPTIONS=--max-old-space-size=15360 tsc --noEmit",
+    "version": "pnpm build"
+  },
+  "lint-staged": {
+    "*.{ts,js}": [
+      "pnpm format",
+      "oxlint --fix",
+      "vitest related --run",
+      "bash -c 'pnpm typecheck'"
+    ]
+  },
+  "devDependencies": {
+    "@types/node": "22.19.1",
+    "@vitest/coverage-v8": "4.0.8",
+    "husky": "9.1.7",
+    "lint-staged": "16.2.7",
+    "oxlint": "1.31.0",
+    "prettier": "3.7.4",
+    "publint": "0.3.16",
+    "tsdown": "0.19.0",
+    "typescript": "5.9.3",
+    "vitest": "4.0.8"
+  },
+  "packageManager": "pnpm@10.23.0",
+  "dependencies": {
+    "@extend/logger": "3.0.7"
+  },
+  "exports": {
+    ".": "./dist/index.mjs",
+    "./package.json": "./package.json"
+  }
+}

@@ -1,0 +1,20 @@
+name: Publish Beta Version
+on:
+  workflow_dispatch:
+    inputs:
+      type:
+        description: 'Type'
+        required: true
+        type: choice
+        options:
+          - 'PATCH'
+          - 'MINOR'
+          - 'MAJOR'
+
+jobs:
+  publish-beta:
+    uses: helloextend/gha-reusable-workflows/.github/workflows/publish-beta.yml@v13.28.1
+    with:
+      
+      type: ${{ github.event.inputs.type }}
+    secrets: inherit

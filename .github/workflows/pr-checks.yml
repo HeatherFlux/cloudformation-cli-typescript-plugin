@@ -1,0 +1,13 @@
+name: PR
+on:
+  pull_request:
+    types: [opened, reopened, synchronize]
+
+concurrency:
+  group: ${{ github.ref }} && ${{ github.workflow }}
+  cancel-in-progress: ${{ github.ref != 'refs/heads/main' }}
+
+jobs:
+  check:
+    uses: helloextend/gha-reusable-workflows/.github/workflows/package-pr-checks-v2.yml@v13.28.1
+    secrets: inherit

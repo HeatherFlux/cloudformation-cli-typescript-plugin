@@ -1,0 +1,11 @@
+name: Merge queue checks
+on:
+  merge_group:
+    types: [checks_requested]
+
+jobs:
+  check:
+    uses: helloextend/gha-reusable-workflows/.github/workflows/package-merge-queue-checks.yml@v13.28.1
+    with:
+      jestParallelization: 1
+    secrets: inherit
