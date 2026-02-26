@@ -12,9 +12,16 @@ jobs:
   build:
     runs-on: ubuntu-latest
     steps:
-    - uses: actions/setup-python@v5
+    - uses: actions/checkout@v4
+    - uses: pnpm/action-setup@v4
+    - uses: actions/setup-node@v4
       with:
-        python-version: 3.9
+        node-version: 20
+        cache: 'pnpm'
+    - run: pnpm install --frozen-lockfile
+    - run: pnpm run build
+    - run: pnpm run lint
+    - run: pnpm test
   os_build:
     runs-on: ${{ matrix.os }}
     strategy:
@@ -36,22 +43,8 @@ jobs:
       HOMEBREW_NO_AUTO_UPDATE: 1
     steps:
       - uses: actions/checkout@v4
-      - name: Set up Docker on macOS
-        if: runner.os == 'macOS'
-        run: |
-          # Docker is pre-installed on macos-latest (M-series) runners.
-          # Just verify it's available; if not, install via Homebrew.
-          if ! command -v docker &>/dev/null; then
-            brew install docker --cask
-          fi
-          # On ARM runners, Docker Desktop manages its own daemon.
-          # If docker info fails, try starting via colima as fallback.
-          if ! docker info &>/dev/null; then
-            brew install colima 2>/dev/null || true
-            colima start
-            echo "DOCKER_HOST=unix://$HOME/.colima/default/docker.sock" >> $GITHUB_ENV
-          fi
-          docker --version
+      # Docker is only reliably available on ubuntu runners.
+      # macOS ARM (macos-latest) runners do not ship Docker Desktop.
       - uses: actions/setup-python@v5
         with:
           python-version: ${{ matrix.python }}
@@ -97,6 +90,7 @@ jobs:
           path: coverage/
       - name: Run Integration Tests
         id: integration_testing
+        if: runner.os == 'Linux'
         run: |
           RPDK_PACKAGE=$(pnpm pack --silent 2>/dev/null | tail -1)
           RPDK_PATH=$PWD/$RPDK_PACKAGE
