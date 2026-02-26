@@ -18,6 +18,7 @@ jobs:
   os_build:
     runs-on: ${{ matrix.os }}
     strategy:
+      fail-fast: false
       matrix:
         os:
          - ubuntu-latest
@@ -35,37 +36,22 @@ jobs:
       HOMEBREW_NO_AUTO_UPDATE: 1
     steps:
       - uses: actions/checkout@v4
-      - name: Update Homebrew and save docker version
+      - name: Set up Docker on macOS
         if: runner.os == 'macOS'
         run: |
-          brew tap homebrew/core
-          cat "$(brew --repository)/Library/Taps/homebrew/homebrew-core/Formula/d/docker.rb" > .github/brew-formulae
-      - name: Configure Homebrew docker cache files
-        uses: actions/cache@v4
-        if: runner.os == 'macOS'
-        with:
-          path: |
-            ~/Library/Caches/Homebrew/docker--*
-            ~/Library/Caches/Homebrew/downloads/*--docker-*
-          key: brew-${{ hashFiles('.github/brew-formulae') }}
-          restore-keys: brew-
-      - name: Install Docker if on MacOS and start colima
-        id: install_mac_docker
-        if: runner.os == 'macOS'
-        run: |
-          brew install docker --cask
-          brew install colima
-          # Docker engine is no longer available because of licensing
-          # Alternative Colima is part of the github macOS runner
-          # SAM v1.47.0+ needed for colima support, unable to use Python 3.6
-          colima start
-          # Ensure colima is configured for later user
-          echo "DOCKER_HOST=unix://$HOME/.colima/default/docker.sock" >> $GITHUB_ENV
-          # Verify Docker
-          docker ps
+          # Docker is pre-installed on macos-latest (M-series) runners.
+          # Just verify it's available; if not, install via Homebrew.
+          if ! command -v docker &>/dev/null; then
+            brew install docker --cask
+          fi
+          # On ARM runners, Docker Desktop manages its own daemon.
+          # If docker info fails, try starting via colima as fallback.
+          if ! docker info &>/dev/null; then
+            brew install colima 2>/dev/null || true
+            colima start
+            echo "DOCKER_HOST=unix://$HOME/.colima/default/docker.sock" >> $GITHUB_ENV
+          fi
           docker --version
-          # Verify colima
-          colima status
       - uses: actions/setup-python@v5
         with:
           python-version: ${{ matrix.python }}
@@ -107,7 +93,7 @@ jobs:
         id: upload_coverage
         uses: actions/upload-artifact@v4
         with:
-          name: coverage
+          name: coverage-${{ matrix.os }}-py${{ matrix.python }}
           path: coverage/
       - name: Run Integration Tests
         id: integration_testing
@@ -147,5 +133,5 @@ jobs:
         if: failure()
         uses: actions/upload-artifact@v4
         with:
-          name: debug-logs
+          name: debug-logs-${{ matrix.os }}-py${{ matrix.python }}
           path: ${{ env.LOG_PATH }}
