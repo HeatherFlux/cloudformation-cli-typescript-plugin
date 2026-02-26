@@ -23,19 +23,18 @@
         "./package.json": "./package.json"
     },
     "engines": {
-        "node": ">=20.0.0",
-        "npm": ">=10.0.0"
+        "node": ">=20.0.0"
     },
     "packageManager": "pnpm@10.23.0",
     "scripts": {
-        "build": "npx tsc",
-        "prepack": "npm run build",
+        "build": "tsc",
+        "prepack": "pnpm run build",
         "format": "prettier --ignore-path .gitignore --write \"**/*.ts\"",
-        "lint": "npx eslint --ext .ts,.js .",
-        "lint:fix": "npx eslint --fix --ext .ts,.js .",
-        "test": "npx jest",
-        "test:debug": "npx --node-arg=--inspect jest --runInBand",
-        "test:coverage": "npx jest --coverage",
+        "lint": "eslint --ext .ts,.js .",
+        "lint:fix": "eslint --fix --ext .ts,.js .",
+        "test": "jest",
+        "test:debug": "node --inspect ./node_modules/.bin/jest --runInBand",
+        "test:coverage": "jest --coverage",
         "typecheck": "tsc --noEmit",
         "prepare": "husky",
         "version": "pnpm build"
@@ -64,7 +63,7 @@
         "@types/uuid": "^9.0.0",
         "@typescript-eslint/eslint-plugin": "^6.0.0",
         "@typescript-eslint/parser": "^6.0.0",
-        "eslint": "~8.21.0",
+        "eslint": "~8.57.0",
         "eslint-config-prettier": "^9.1.0",
         "eslint-import-resolver-node": "^0.3.3",
         "eslint-import-resolver-typescript": "^3.6.0",

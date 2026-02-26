@@ -73,17 +73,18 @@ jobs:
           pip install --upgrade pip
           pip install --upgrade setuptools wheel aws-sam-cli -r https://raw.githubusercontent.com/aws-cloudformation/cloudformation-cli/master/requirements.txt
           pip install .
+      - uses: pnpm/action-setup@v4
       - uses: actions/setup-node@v3
         with:
           node-version: ${{ matrix.node }}
-          cache: 'npm'
+          cache: 'pnpm'
       - name: Install Dependencies Node.js
         id: install_nodejs
         # Touch needed because of https://github.com/aws/aws-cli/issues/2639
         run: |
-          npm ci --include=optional
+          pnpm install --frozen-lockfile
           find ./node_modules/* -mtime +10950 -exec touch {} \;
-          npm run build
+          pnpm run build
       - uses: actions/cache@v3
         with:
           path: ~/.cache/pre-commit/
@@ -107,7 +108,7 @@ jobs:
       - name: Run Integration Tests
         id: integration_testing
         run: |
-          RPDK_PACKAGE=$(npm pack --silent)
+          RPDK_PACKAGE=$(pnpm pack --silent 2>/dev/null | tail -1)
           RPDK_PATH=$PWD/$RPDK_PACKAGE
           DIR=TestCI
           mkdir $DIR

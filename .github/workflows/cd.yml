@@ -13,6 +13,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v3
+      - uses: pnpm/action-setup@v4
       - uses: actions/setup-node@v3
         with:
           node-version: 20
@@ -24,8 +25,8 @@ jobs:
       - name: Install Dependencies and Package Project
         id: installing
         run: |
-          npm ci --optional
-          npm pack
+          pnpm install --frozen-lockfile
+          pnpm pack
       - name: Upload NPM Artifacts
         id: upload_npm
         uses: actions/upload-artifact@v4
