@@ -244,7 +244,8 @@ _CLI Plugin: v1.0.1_
 - [Support Library] Base Model class as well as Progress Event class (#2)
 
 
-[Unreleased]: https://github.com/aws-cloudformation/cloudformation-cli-typescript-plugin/compare/v1.0.6...HEAD
+[Unreleased]: https://github.com/aws-cloudformation/cloudformation-cli-typescript-plugin/compare/v2.0.0...HEAD
+[2.0.0]: https://github.com/aws-cloudformation/cloudformation-cli-typescript-plugin/compare/v1.0.6...v2.0.0
 [1.0.6]: https://github.com/aws-cloudformation/cloudformation-cli-typescript-plugin/compare/v1.0.5...v1.0.6
 [1.0.5]: https://github.com/aws-cloudformation/cloudformation-cli-typescript-plugin/compare/v1.0.4...v1.0.5
 [1.0.4]: https://github.com/aws-cloudformation/cloudformation-cli-typescript-plugin/compare/v1.0.3...v1.0.4

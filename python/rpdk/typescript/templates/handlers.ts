@@ -51,9 +51,9 @@ class Resource extends BaseResource<ResourceModel, TypeConfigurationModel> {
         } catch(err) {
             logger.log(err);
             // exceptions module lets CloudFormation know the type of failure that occurred
-            throw new exceptions.InternalFailure(err.message);
+            throw new exceptions.InternalFailure((err as Error).message);
             // this can also be done by returning a failed progress event
-            // return ProgressEvent.failed(HandlerErrorCode.InternalFailure, err.message);
+            // return ProgressEvent.failed(HandlerErrorCode.InternalFailure, (err as Error).message);
         }
         return progress;
     }
