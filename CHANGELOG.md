@@ -22,7 +22,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - [Support Library] Enable `strictNullChecks: true` across the entire codebase. Null/undefined handling is now fully type-safe throughout `src/` and `tests/lib/`.
 - [CLI Plugin] `SUPPORT_LIB_VERSION` is now read dynamically from `data/support-lib-version.txt` instead of being hardcoded in `codegen.py`. The existing CI sync-test also validates the data file.
 
-### Fixed
+### Improved
 - [Support Library] Replace all untyped `resource['privateField']` bracket-notation accesses in tests with a typed `asTestable(resource)` helper (see `tests/lib/helpers.ts`). Tested private methods are now `protected` in `BaseResource`; tests use the public subclass API.
 - [Support Library] Convert direct `prototype.publishMessage = mock` assignments in tests to `jest.spyOn().mockImplementation()` so Jest properly restores them after each test (no prototype mutation leak).
 - [Support Library] Remove Java `serialVersionUID` constant from `BaseHandlerException` — unused in TypeScript, caused a precision-loss lint warning (the literal exceeds `Number.MAX_SAFE_INTEGER`).

@@ -21,27 +21,27 @@ jobs:
       matrix:
         os:
          - ubuntu-latest
-         - macos-12 # Later versions of ARM-based macOS runners fail because the hypervisor framework required for Docker is not supported
-        python: [ "3.8", "3.9", "3.10", "3.11"]
+         - macos-latest
+        python: [ "3.9", "3.10", "3.11", "3.12", "3.13"]
         node: [ 20 ]
     env:
       SAM_CLI_TELEMETRY: "0"
       AWS_REGION: "us-east-1"
       AWS_DEFAULT_REGION: "us-east-1"
-      AWS_ACCESS_KEY_ID: "AKIAIOSFODNN7EXAMPLE"
-      AWS_SECRET_ACCESS_KEY: "wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY"
+      AWS_ACCESS_KEY_ID: "test-access-key-id"
+      AWS_SECRET_ACCESS_KEY: "test-secret-access-key"
       LOG_PATH: /tmp/debug-logs
       PIP_LOG_FILE: /tmp/pip.log
       HOMEBREW_NO_AUTO_UPDATE: 1
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
       - name: Update Homebrew and save docker version
         if: runner.os == 'macOS'
         run: |
           brew tap homebrew/core
           cat "$(brew --repository)/Library/Taps/homebrew/homebrew-core/Formula/d/docker.rb" > .github/brew-formulae
       - name: Configure Homebrew docker cache files
-        uses: actions/cache@v3
+        uses: actions/cache@v4
         if: runner.os == 'macOS'
         with:
           path: |
@@ -66,7 +66,7 @@ jobs:
           docker --version
           # Verify colima
           colima status
-      - uses: actions/setup-python@v4
+      - uses: actions/setup-python@v5
         with:
           python-version: ${{ matrix.python }}
           cache: 'pip'
@@ -78,7 +78,7 @@ jobs:
           pip install --upgrade setuptools wheel aws-sam-cli -r https://raw.githubusercontent.com/aws-cloudformation/cloudformation-cli/master/requirements.txt
           pip install .
       - uses: pnpm/action-setup@v4
-      - uses: actions/setup-node@v3
+      - uses: actions/setup-node@v4
         with:
           node-version: ${{ matrix.node }}
           cache: 'pnpm'
@@ -89,7 +89,7 @@ jobs:
           pnpm install --frozen-lockfile
           find ./node_modules/* -mtime +10950 -exec touch {} \;
           pnpm run build
-      - uses: actions/cache@v3
+      - uses: actions/cache@v4
         with:
           path: ~/.cache/pre-commit/
           key: ${{ matrix.os }}-${{ env.pythonLocation }}${{ hashFiles('.pre-commit-config.yaml') }}
@@ -105,7 +105,7 @@ jobs:
           bash codecov.sh -f coverage/ts/coverage-final.json -F unittests -n codecov-typescript
       - name: Upload Coverage Artifacts
         id: upload_coverage
-        uses: actions/upload-artifact@v3
+        uses: actions/upload-artifact@v4
         with:
           name: coverage
           path: coverage/
@@ -145,7 +145,7 @@ jobs:
       - name: Upload Debug Artifacts
         id: upload_logs
         if: failure()
-        uses: actions/upload-artifact@v3
+        uses: actions/upload-artifact@v4
         with:
           name: debug-logs
           path: ${{ env.LOG_PATH }}

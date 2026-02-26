@@ -3,12 +3,7 @@ module.exports = {
         jest: true,
         node: true,
     },
-    plugins: [
-        '@typescript-eslint',
-        'prettier',
-        'import',
-        'prefer-arrow'
-    ],
+    plugins: ['@typescript-eslint', 'prettier', 'import', 'prefer-arrow'],
     parser: '@typescript-eslint/parser',
     parserOptions: {
         ecmaVersion: 'latest',
@@ -39,7 +34,10 @@ module.exports = {
         '@typescript-eslint/no-empty-function': ['warn'],
         '@typescript-eslint/no-explicit-any': ['warn'],
 
-        '@typescript-eslint/no-unused-vars': ['warn', { argsIgnorePattern: '^_', varsIgnorePattern: '^_' }],
+        '@typescript-eslint/no-unused-vars': [
+            'warn',
+            { argsIgnorePattern: '^_', varsIgnorePattern: '^_' },
+        ],
         '@typescript-eslint/no-loss-of-precision': ['warn'],
 
         // Require all imported dependencies are actually declared in package.json
@@ -52,7 +50,7 @@ module.exports = {
             rules: {
                 '@typescript-eslint/explicit-function-return-type': 'off',
                 '@typescript-eslint/no-unused-vars': 'off',
-                '@typescript-eslint/no-var-requires': 'off',
+                // no-var-requires is deprecated in @typescript-eslint/eslint-plugin v8+; no-require-imports handles this
                 '@typescript-eslint/no-require-imports': 'off',
             },
         },

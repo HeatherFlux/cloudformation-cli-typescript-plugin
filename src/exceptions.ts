@@ -13,7 +13,7 @@ export abstract class BaseHandlerException extends Error {
     }
 
     public toProgressEvent<T extends BaseModel = BaseModel>(): ProgressEvent<T> {
-        return ProgressEvent.failed<ProgressEvent<T>>(this.errorCode, this.toString());
+        return ProgressEvent.failed<ProgressEvent<T>>(this.errorCode, this.message);
     }
 }
 

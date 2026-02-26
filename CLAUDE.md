@@ -52,7 +52,7 @@ pytest tests/plugin/
   - `testEntrypoint()` — Used for local SAM testing.
   - `handlerEvent(action)` — Decorator that registers a method as the handler for a specific `Action` (CREATE, READ, UPDATE, DELETE, LIST).
 
-- **`proxy.ts`** — `SessionProxy` wraps AWS SDK v2 credentials into a typed client factory. `ProgressEvent<T>` is the response type for all handlers, with static factory methods: `ProgressEvent.success()`, `ProgressEvent.failed()`, `ProgressEvent.progress()`.
+- **`proxy.ts`** — `SessionProxy` wraps AWS SDK v3 credentials into a typed client factory via `client<T>(ClientClass, options?)`. `ProgressEvent<T>` is the response type for all handlers, with static factory methods: `ProgressEvent.success()`, `ProgressEvent.failed()`, `ProgressEvent.progress()`.
 
 - **`interface.ts`** — Core types: `Action`, `OperationStatus`, `HandlerErrorCode` enums; `BaseModel` and `BaseDto` base classes (use `class-transformer` `@Expose()`/`@Exclude()` decorators for serialization); `HandlerRequest`, `BaseResourceHandlerRequest`, `CfnResponse`.
 

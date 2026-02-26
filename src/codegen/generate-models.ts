@@ -11,7 +11,7 @@ import { resolveModels } from './resolver';
 import type { ResolvedModels, ResolvedType } from './resolver';
 import type { CfnResourceSchema } from './schema';
 import { containsModel, getInnerType, translateType } from './translate';
-import { lowercaseFirst, tsPropName, uppercaseFirst } from './utils';
+import { tsPropName, uppercaseFirst } from './utils';
 
 /** Options controlling how models.ts is generated. */
 export interface GenerateModelsOptions {
@@ -57,7 +57,7 @@ function identifierKeyName(path: string): string {
  * e.g. `"/properties/Config/Timeout"` → `this.config.timeout`.
  */
 function identifierAccessChain(path: string): string {
-    return 'this.' + identifierComponents(path).map(lowercaseFirst).join('.');
+    return 'this.' + identifierComponents(path).map(tsPropName).join('.');
 }
 
 /**
@@ -69,7 +69,7 @@ function identifierNullGuard(path: string): string {
     const components = identifierComponents(path);
     const guards: string[] = [];
     for (let i = 1; i <= components.length; i++) {
-        const chain = 'this.' + components.slice(0, i).map(lowercaseFirst).join('.');
+        const chain = 'this.' + components.slice(0, i).map(tsPropName).join('.');
         guards.push(`${chain} != null`);
     }
     return guards.join('\n            && ');
@@ -213,22 +213,18 @@ function generateModelClass(
         lines.push(`    public static readonly TYPE_NAME: string = '${typeName}';`);
         lines.push('');
 
-        for (const path of primaryIdentifier) {
-            lines.push(`    @Exclude()`);
-            lines.push(
-                `    protected readonly ${identifierKeyName(path)}: string = '${path}';`
-            );
-            lines.push('');
-        }
-
-        for (const ids of additionalIdentifiers) {
-            for (const path of ids) {
+        // Collect all identifier paths, deduplicating across primary and additional
+        const emittedKeys = new Set<string>();
+        const allIdentifierPaths = [
+            ...primaryIdentifier,
+            ...additionalIdentifiers.flat(),
+        ];
+        for (const idPath of allIdentifierPaths) {
+            const keyName = identifierKeyName(idPath);
+            if (!emittedKeys.has(keyName)) {
+                emittedKeys.add(keyName);
                 lines.push(`    @Exclude()`);
-                lines.push(
-                    `    protected readonly ${identifierKeyName(
-                        path
-                    )}: string = '${path}';`
-                );
+                lines.push(`    protected readonly ${keyName}: string = '${idPath}';`);
                 lines.push('');
             }
         }

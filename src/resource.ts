@@ -452,6 +452,12 @@ export abstract class BaseResource<
                         msg
                     );
                 }
+            } else {
+                this.log(`Exception caught: non-Error value thrown: ${err}`);
+                progress = ProgressEvent.failed<ProgressEvent<T>>(
+                    HandlerErrorCode.InternalFailure,
+                    `${err}`
+                );
             }
         }
         this.log(`END RequestId: ${context?.awsRequestId}`);
@@ -536,7 +542,7 @@ export abstract class BaseResource<
             this.log('Invalid Type Configuration');
             throw new InvalidTypeConfiguration(
                 this.typeName,
-                `${err} (${err instanceof Error ? err.name : 'UnknownError'}`
+                `${err} (${err instanceof Error ? err.name : 'UnknownError'})`
             );
         }
     };
@@ -652,6 +658,12 @@ export abstract class BaseResource<
                         err.message
                     );
                 }
+            } else {
+                this.log(`Exception caught: non-Error value thrown: ${err}`);
+                progress = ProgressEvent.failed<ProgressEvent<T>>(
+                    HandlerErrorCode.InternalFailure,
+                    `${err}`
+                );
             }
         }
         this.log(`END RequestId: ${context?.awsRequestId}`);

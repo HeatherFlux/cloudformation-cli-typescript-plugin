@@ -138,12 +138,12 @@ describe('when getting interface', () => {
         expect(request.desiredResourceState).not.toBeNull();
     });
 
-    test('unmodeled request partion', () => {
-        const partionMap = [null, 'aws', 'aws-cn', 'aws-gov'];
+    test('unmodeled request partition', () => {
+        const partitionMap = [null, 'aws', 'aws-cn', 'aws-gov'];
         [null, 'us-east-1', 'cn-region1', 'us-gov-region1'].forEach(
             (region: string | null, index: number) => {
-                const partion = UnmodeledRequest.getPartition(region);
-                expect(partion).toBe(partionMap[index]);
+                const partition = UnmodeledRequest.getPartition(region);
+                expect(partition).toBe(partitionMap[index]);
             }
         );
     });

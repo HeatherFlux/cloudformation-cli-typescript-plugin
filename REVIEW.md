@@ -1,7 +1,7 @@
 # Repository Review: cloudformation-cli-typescript-plugin
 
 **Date:** 2026-02-26
-**Branch:** `bugfix/arch-1058-fix-dependency-and-python`
+**Branch:** `feat/cfn-typescript-plugin`
 **Status:** Build clean, lint clean, 279 TS tests pass, 110 Python tests pass
 
 ---

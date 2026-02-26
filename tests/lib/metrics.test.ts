@@ -244,7 +244,7 @@ describe('when getting metrics', () => {
         await proxy.publishLogDeliveryExceptionMetric(MOCK_DATE, new TypeError('test'));
         expect(mockSend).toHaveBeenCalledTimes(1);
         expect(spyLogger).toHaveBeenCalledTimes(1);
-        expect(spyPublishLog).toHaveReturnedWith(Promise.resolve(null));
+        await expect(spyPublishLog.mock.results[0].value).resolves.toBeUndefined();
     });
 
     test('publishLogDeliveryExceptionMetric catches rethrowing error from publishMetric', async () => {

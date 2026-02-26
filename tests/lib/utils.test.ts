@@ -20,9 +20,9 @@ describe('when getting utils', () => {
 
         test('should replace all occurrences', () => {
             const BEARER_TOKEN = 'ce1919f7-8f9b-43fd-881e-c616ca74c4d3';
-            const SECRET_ACCESS_KEY = '66iOGPN5LnpZorcLr8Kh25u8AbjHVllv5/poh2O0';
+            const SECRET_ACCESS_KEY = 'test-secret-key-00000000000000000000';
             const SESSION_TOKEN =
-                'lameHS2vQOknSHWhdFYTxm2eJc1JMn9YBNI4nV4mXue945KPL6DHfW8EsUQT5zwssYEC1NvYP9yD6Y5s5lKR3chflOHPFsIe6eqg\\.*+-?^${}()|[]';
+                'test-session-token-000000000000000000000000000000000000000000000000\\.*+-?^${}()|[]';
             const input = `
             {
                 awsAccountId: '123456789012',
@@ -150,7 +150,7 @@ describe('when getting utils', () => {
             deepFreeze(proto);
             expect(Object.isFrozen(proto)).toBe(true);
             expect(Object.isFrozen(proto.child)).toBe(true);
-            expect(Object.isFrozen(proto.function)).toBe(true);
+            expect(Object.isFrozen(proto.fun)).toBe(true);
             expect(Object.isFrozen(proto.ob2Prop)).toBe(false);
             expect(Object.isFrozen(proto.proto.test)).toBe(false);
         });

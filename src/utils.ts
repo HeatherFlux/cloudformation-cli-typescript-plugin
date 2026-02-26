@@ -57,7 +57,7 @@ export class ProgressTracker extends EventEmitter {
     }
 
     addSubmitted(): void {
-        if (this.isFinished) {
+        if (this.done) {
             throw new Error(
                 'Not allowed to submit a new task after progress tracker has been closed.'
             );

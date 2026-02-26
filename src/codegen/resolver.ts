@@ -85,13 +85,21 @@ function resolveProperty(
     prop: CfnPropertySchema,
     definitions: Record<string, CfnPropertySchema>
 ): ResolvedType {
-    // $ref → model or primitive alias
+    // $ref → model, primitive alias, or inline-resolved type
     if (prop.$ref) {
         const name = refToName(prop.$ref);
         const def = definitions[name];
-        if (def && isPrimitiveDefinition(def)) {
-            const t = Array.isArray(def.type) ? def.type[0] : (def.type as string);
-            return { container: 'primitive', type: PRIMITIVE_MAP[t] };
+        if (def) {
+            if (isPrimitiveDefinition(def)) {
+                const t = Array.isArray(def.type) ? def.type[0] : (def.type as string);
+                return { container: 'primitive', type: PRIMITIVE_MAP[t] };
+            }
+            // If the definition is not a proper model (no properties), resolve it inline
+            // This handles list/map aliases and type-less definitions
+            const defType = Array.isArray(def.type) ? def.type[0] : def.type;
+            if (defType !== 'object' || !def.properties) {
+                return resolveProperty(def, definitions);
+            }
         }
         return { container: 'model', type: name };
     }

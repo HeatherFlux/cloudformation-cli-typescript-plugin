@@ -62,16 +62,16 @@ describe('when getting resource', () => {
             callbackContext: {},
             requestData: {
                 callerCredentials: {
-                    accessKeyId: 'IASAYK835GAIFHAHEI23',
-                    secretAccessKey: '66iOGPN5LnpZorcLr8Kh25u8AbjHVllv5/poh2O0',
+                    accessKeyId: 'test-access-key-000000000000',
+                    secretAccessKey: 'test-secret-key-00000000000000000000',
                     sessionToken:
-                        'lameHS2vQOknSHWhdFYTxm2eJc1JMn9YBNI4nV4mXue945KPL6DHfW8EsUQT5zwssYEC1NvYP9yD6Y5s5lKR3chflOHPFsIe6eqg',
+                        'test-session-token-000000000000000000000000000000000000000000000000',
                 },
                 providerCredentials: {
-                    accessKeyId: 'HDI0745692Y45IUTYR78',
-                    secretAccessKey: '4976TUYVI234/5GW87ERYG823RF87GY9EIUH452I3',
+                    accessKeyId: 'test-provider-key-0000000000',
+                    secretAccessKey: 'test-provider-secret-000000000000000000',
                     sessionToken:
-                        '842HYOFIQAEUDF78R8T7IU43HSADYGIFHBJSDHFA87SDF9PYvN1CEYASDUYFT5TQ97YASIHUDFAIUEYRISDKJHFAYSUDTFSDFADS',
+                        'test-provider-session-0000000000000000000000000000000000000000000000',
                 },
                 providerLogGroupName: 'provider-logging-group-name',
                 logicalResourceId: 'myBucket',
@@ -144,7 +144,7 @@ describe('when getting resource', () => {
         const resource = new Resource(TYPE_NAME, null as any);
         const event = await resource.entrypoint({}, MOCK_CTX);
         expect(event).toMatchObject({
-            message: 'Error: Missing Model class to be used to deserialize JSON data.',
+            message: 'Missing Model class to be used to deserialize JSON data.',
             status: OperationStatus.Failed,
             errorCode: HandlerErrorCode.InternalFailure,
         });
@@ -222,7 +222,7 @@ describe('when getting resource', () => {
         expect(spyInvokeHandler).toBeCalledTimes(1);
         expect(event).toMatchObject({
             errorCode: 'InvalidRequest',
-            message: 'Error: handler failed',
+            message: 'handler failed',
             status: OperationStatus.Failed,
             callbackDelaySeconds: 0,
         });
@@ -1001,7 +1001,7 @@ describe('when getting resource', () => {
         const resource = new Resource(TYPE_NAME, null as any);
         const event = await resource.testEntrypoint({}, undefined);
         expect(event).toMatchObject({
-            message: 'Error: Missing Model class to be used to deserialize JSON data.',
+            message: 'Missing Model class to be used to deserialize JSON data.',
             status: OperationStatus.Failed,
             errorCode: HandlerErrorCode.InternalFailure,
         });

@@ -390,7 +390,8 @@ class TypescriptLanguagePlugin(LanguagePlugin):
                 )
 
         except (FileNotFoundError, CalledProcessError) as e:
-            LOG.warning(e.stderr)
+            if hasattr(e, 'stderr') and e.stderr:
+                LOG.warning(e.stderr)
             raise DownstreamError("local build failed") from e
 
         LOG.debug("--- build stdout:\n%s", completed_proc.stdout)

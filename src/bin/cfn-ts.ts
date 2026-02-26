@@ -596,6 +596,14 @@ function parseArgs(argv: string[]): ParsedArgs {
         region: process.env.AWS_REGION ?? process.env.AWS_DEFAULT_REGION ?? 'us-east-1',
     };
 
+    const requireValue = (flag: string, i: number): string => {
+        const next = args[i + 1];
+        if (next === undefined || next.startsWith('-')) {
+            throw new Error(`${flag} requires a value.`);
+        }
+        return next;
+    };
+
     for (let i = 0; i < args.length; i++) {
         const arg = args[i];
         if (arg === '--help' || arg === '-h') {
@@ -603,19 +611,24 @@ function parseArgs(argv: string[]): ParsedArgs {
         } else if (arg === '--version' || arg === '-v') {
             result.version = true;
         } else if (arg === '--schema') {
-            result.schema = args[++i];
+            result.schema = requireValue('--schema', i);
+            i++;
         } else if (arg === '--output') {
-            result.output = path.resolve(args[++i]);
+            result.output = path.resolve(requireValue('--output', i));
+            i++;
         } else if (arg === '--type-name') {
-            result.typeName = args[++i];
+            result.typeName = requireValue('--type-name', i);
+            i++;
         } else if (arg === '--set-default') {
             result.setDefault = true;
         } else if (arg === '--role-arn') {
-            result.roleArn = args[++i];
+            result.roleArn = requireValue('--role-arn', i);
+            i++;
         } else if (arg === '--no-role') {
             result.noRole = true;
         } else if (arg === '--region') {
-            result.region = args[++i];
+            result.region = requireValue('--region', i);
+            i++;
         } else if (arg === '--dry-run') {
             result.dryRun = true;
         } else if (arg === '--use-docker') {

@@ -57,6 +57,23 @@ interface IntegerConstructor extends BigIntConstructor {
 /**
  * Wrapper with additional JSON serialization for bigint type
  */
+// Set up BigInt JSON serialization and isSafeInteger once, not on every call
+// @ts-expect-error toJSON is not part of the BigInt type definition but is needed for JSON.stringify
+BigInt.prototype.toJSON = function (): number {
+    return Number(this.valueOf());
+};
+
+const isSafeInteger = (value: bigint): boolean => {
+    if (
+        value &&
+        (value < BigInt(Number.MIN_SAFE_INTEGER) ||
+            value > BigInt(Number.MAX_SAFE_INTEGER))
+    ) {
+        return false;
+    }
+    return true;
+};
+
 // @ts-expect-error new Proxy(BigInt, handler) is not assignable to IntegerConstructor
 export const Integer: IntegerConstructor = new Proxy(BigInt, {
     // @ts-expect-error Proxy apply trap signature does not match IntegerConstructor exactly
@@ -65,19 +82,6 @@ export const Integer: IntegerConstructor = new Proxy(BigInt, {
         _thisArg: unknown,
         argArray?: unknown[]
     ): integer {
-        target.prototype.toJSON = function (): number {
-            return Number(this.valueOf());
-        };
-        const isSafeInteger = (value: bigint): boolean => {
-            if (
-                value &&
-                (value < BigInt(Number.MIN_SAFE_INTEGER) ||
-                    value > BigInt(Number.MAX_SAFE_INTEGER))
-            ) {
-                return false;
-            }
-            return true;
-        };
         target.isSafeInteger = isSafeInteger;
         // @ts-expect-error argArray is unknown
         const value = target(...argArray);

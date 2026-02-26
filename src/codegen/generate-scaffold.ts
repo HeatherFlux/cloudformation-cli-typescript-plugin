@@ -264,10 +264,10 @@ export function generateNpmrc(): string {
 export function generateSamTestCreate(_options: ScaffoldOptions): string {
     const payload = {
         credentials: {
-            accessKeyId: 'IASAYK835GAIFHAHEI23',
-            secretAccessKey: '66iOGPN5LnpZorcLr8Kh25u8AbjHVllv5/poh2O0',
+            accessKeyId: 'test-access-key-000000000000',
+            secretAccessKey: 'test-secret-key-00000000000000000000',
             sessionToken:
-                'lameHS2vQOknSHWhdFYTxm2eJc1JMn9YBNI4nV4mXue945KPL6DHfW8EsUQT5zwssYEC1NvYP9yD6Y5s5lKR3chflOHPFsIe6eqg',
+                'test-session-token-000000000000000000000000000000000000000000000000',
         },
         action: 'CREATE',
         request: {

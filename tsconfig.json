@@ -2,7 +2,7 @@
     "extends": "@tsconfig/node20/tsconfig.json",
     "compilerOptions": {
         "strict": true,
-        "noImplicitAny": false,
+        "noImplicitAny": false, // Deliberate override: class-transformer decorators and SDK patterns require implicit any in some contexts
         "strictNullChecks": true,
         "strictPropertyInitialization": false,
         "allowJs": true,
