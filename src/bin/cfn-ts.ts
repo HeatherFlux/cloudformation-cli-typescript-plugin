@@ -2,13 +2,13 @@
 /**
  * cfn-ts — Native TypeScript CLI for CloudFormation resource provider development.
  *
- * A TypeScript-native alternative to `cfn generate` / `cfn init` that works
- * without the Python cloudformation-cli. Reads CloudFormation resource provider
- * schemas and generates TypeScript source files.
+ * A TypeScript-native alternative to the Python `cfn` CLI. Handles the full
+ * lifecycle: init, generate, and submit — all without Python.
  *
  * Usage:
+ *   cfn-ts init     --type-name <Org::Svc::Res> [--output <dir>]
  *   cfn-ts generate [--schema <path>] [--output <dir>]
- *   cfn-ts init --type-name <Org::Svc::Res> [--output <dir>]
+ *   cfn-ts submit   [--set-default] [--region <region>] [--dry-run]
  *   cfn-ts --help
  *   cfn-ts --version
  */
@@ -31,6 +31,24 @@ import {
 } from '../codegen';
 import type { CfnResourceSchema } from '../codegen';
 
+import {
+    buildProject,
+    createResourceZip,
+    ensureSubmitBucket,
+    uploadHandlerPackage,
+    extractHandlerPermissions,
+    ensureExecutionRole,
+    registerType,
+    pollRegistration,
+    setDefaultVersion,
+} from '../submit';
+import type { CfnResourceSchemaWithHandlers } from '../submit';
+
+import { S3Client } from '@aws-sdk/client-s3';
+import { IAMClient } from '@aws-sdk/client-iam';
+import { STSClient, GetCallerIdentityCommand } from '@aws-sdk/client-sts';
+import { CloudFormationClient } from '@aws-sdk/client-cloudformation';
+
 // ---------------------------------------------------------------------------
 // Constants
 // ---------------------------------------------------------------------------
@@ -42,6 +60,9 @@ const RUNTIME = 'nodejs20.x';
 const ENTRY_POINT = 'dist/handlers.entrypoint';
 const TEST_ENTRY_POINT = 'dist/handlers.testEntrypoint';
 const CODE_URI = './';
+
+/** Delay (ms) after IAM role creation before calling RegisterType. */
+const IAM_PROPAGATION_DELAY = 10_000;
 
 // ---------------------------------------------------------------------------
 // ANSI colour helpers (no external deps)
@@ -327,6 +348,168 @@ function cmdInit(opts: { typeName: string; output: string }): void {
     log('');
 }
 
+/**
+ * `cfn-ts submit` — build, package, and register a CloudFormation resource type.
+ */
+async function cmdSubmit(opts: {
+    schema?: string;
+    output: string;
+    setDefault?: boolean;
+    roleArn?: string;
+    noRole?: boolean;
+    region: string;
+    dryRun?: boolean;
+    useDocker?: boolean;
+}): Promise<void> {
+    log(c.bold('\ncfn-ts submit'));
+    log(c.dim('─'.repeat(40)));
+
+    // Validate mutual exclusion
+    if (opts.roleArn && opts.noRole) {
+        throw new Error('--role-arn and --no-role are mutually exclusive.');
+    }
+
+    // Step 1: Find and validate schema
+    const schemaPath = findSchema(opts.output, opts.schema);
+    const schema = JSON.parse(
+        fs.readFileSync(schemaPath, 'utf8')
+    ) as CfnResourceSchemaWithHandlers;
+    validateTypeName(schema.typeName);
+
+    log(`  Schema:  ${c.cyan(path.relative(process.cwd(), schemaPath))}`);
+    log(`  Type:    ${c.cyan(schema.typeName)}`);
+    log(`  Region:  ${c.cyan(opts.region)}`);
+    log('');
+
+    // Step 2: Build
+    log(c.bold('  Building...'));
+    buildProject({ projectDir: opts.output, useDocker: opts.useDocker });
+    ok('Build complete');
+
+    // Step 3: Create ZIP
+    const buildDir = path.join(opts.output, 'build', 'TypeFunction');
+    const zipPath = path.join(opts.output, 'build', 'ResourceProvider.zip');
+    createResourceZip(buildDir, zipPath);
+    const zipSize = fs.statSync(zipPath).size;
+    ok(`Package created (${(zipSize / 1024 / 1024).toFixed(1)} MB)`);
+
+    if (opts.dryRun) {
+        log(c.green('\n  Dry run complete. Package created but not registered.'));
+        log(`  Package: ${c.cyan(path.relative(process.cwd(), zipPath))}\n`);
+        return;
+    }
+
+    // Step 4: Get account ID
+    const sts = new STSClient({ region: opts.region });
+    let accountId: string;
+    try {
+        const identity = await sts.send(new GetCallerIdentityCommand({}));
+        accountId = identity.Account!;
+    } catch (e) {
+        throw new Error(
+            'AWS credentials not configured. Set AWS_ACCESS_KEY_ID/AWS_SECRET_ACCESS_KEY, ' +
+                'configure ~/.aws/credentials, or assume a role first.\n' +
+                (e instanceof Error ? `  Cause: ${e.message}` : '')
+        );
+    }
+    log(`  Account: ${c.cyan(accountId)}`);
+
+    // Step 5: Upload to S3
+    log(c.bold('\n  Uploading to S3...'));
+    const s3 = new S3Client({ region: opts.region });
+    const bucketName = await ensureSubmitBucket(s3, {
+        region: opts.region,
+        accountId,
+    });
+    const { bucket, key } = await uploadHandlerPackage(
+        s3,
+        bucketName,
+        zipPath,
+        schema.typeName
+    );
+    ok(`Uploaded to s3://${bucket}/${key}`);
+
+    // Step 6: Execution role
+    let executionRoleArn: string | undefined;
+    let roleCreated = false;
+
+    if (opts.roleArn) {
+        executionRoleArn = opts.roleArn;
+        ok(`Using role: ${c.cyan(executionRoleArn)}`);
+    } else if (!opts.noRole) {
+        const permissions = extractHandlerPermissions(schema);
+        if (permissions.length === 0) {
+            log(
+                `  ${c.yellow('!')} No handler permissions in schema — skipping role creation.`
+            );
+        } else {
+            log(c.bold('\n  Creating execution role...'));
+            const iam = new IAMClient({ region: opts.region });
+            executionRoleArn = await ensureExecutionRole(iam, {
+                typeName: schema.typeName,
+                permissions,
+            });
+            ok(`Execution role: ${c.cyan(executionRoleArn)}`);
+            roleCreated = true;
+        }
+    }
+
+    // Wait for IAM propagation if we just created a role
+    if (roleCreated) {
+        log(
+            `  ${c.dim(
+                `Waiting ${IAM_PROPAGATION_DELAY / 1000}s for IAM role propagation...`
+            )}`
+        );
+        await new Promise((r) => setTimeout(r, IAM_PROPAGATION_DELAY));
+    }
+
+    // Step 7: Register type
+    log(c.bold('\n  Registering type...'));
+    const cfn = new CloudFormationClient({ region: opts.region });
+    const registrationToken = await registerType(cfn, {
+        typeName: schema.typeName,
+        schemaBody: JSON.stringify(schema),
+        s3Bucket: bucket,
+        s3Key: key,
+        executionRoleArn,
+    });
+    log(`  Token:   ${c.dim(registrationToken)}`);
+
+    // Step 8: Poll for completion
+    log('  Waiting for registration to complete...');
+    const result = await pollRegistration(cfn, registrationToken, {
+        onPoll: () => process.stdout.write(c.dim('.')),
+    });
+    log(''); // newline after dots
+
+    if (result.status === 'FAILED') {
+        throw new Error(
+            `Registration failed: ${result.description ?? 'unknown error'}`
+        );
+    }
+
+    if (result.status === 'IN_PROGRESS') {
+        log(
+            c.yellow(
+                `\n  Registration still in progress. Track with:\n` +
+                    `  aws cloudformation describe-type-registration --registration-token ${registrationToken}\n`
+            )
+        );
+        return;
+    }
+
+    ok(`Registered: ${c.cyan(result.typeVersionArn ?? '')}`);
+
+    // Step 9: Set default version
+    if (opts.setDefault && result.typeVersionArn) {
+        await setDefaultVersion(cfn, result.typeVersionArn);
+        ok('Set as default version');
+    }
+
+    log(c.green('\n  Submit complete.\n'));
+}
+
 // ---------------------------------------------------------------------------
 // Help and version
 // ---------------------------------------------------------------------------
@@ -337,23 +520,37 @@ function printHelp(): void {
 ${name} — Native TypeScript CLI for CloudFormation resource provider development
 
 ${c.bold('USAGE')}
-  cfn-ts generate [options]   Regenerate src/models.ts from the resource schema
   cfn-ts init     [options]   Scaffold a new resource provider project
+  cfn-ts generate [options]   Regenerate src/models.ts from the resource schema
+  cfn-ts submit   [options]   Build, package, and register the resource type
   cfn-ts --help               Show this help message
   cfn-ts --version            Show version
-
-${c.bold('GENERATE OPTIONS')}
-  --schema  <path>   Path to the schema file (auto-detected if omitted)
-  --output  <dir>    Project root directory (default: current directory)
 
 ${c.bold('INIT OPTIONS')}
   --type-name <Org::Svc::Res>  CloudFormation type name (required)
   --output    <dir>            Project root directory (default: current directory)
 
+${c.bold('GENERATE OPTIONS')}
+  --schema  <path>   Path to the schema file (auto-detected if omitted)
+  --output  <dir>    Project root directory (default: current directory)
+
+${c.bold('SUBMIT OPTIONS')}
+  --schema      <path>     Path to the schema file (auto-detected if omitted)
+  --output      <dir>      Project root directory (default: current directory)
+  --region      <region>   AWS region (default: AWS_REGION env or us-east-1)
+  --role-arn    <arn>       Use an existing IAM execution role
+  --no-role                Skip execution role creation
+  --set-default            Set registered version as the default
+  --dry-run                Build and package only — do not call AWS APIs
+  --use-docker             Use Docker for SAM build
+
 ${c.bold('EXAMPLES')}
   cfn-ts init --type-name My::Bucket::Resource
   cfn-ts generate
   cfn-ts generate --schema my-bucket-resource.json --output ./my-project
+  cfn-ts submit --set-default --region us-east-1
+  cfn-ts submit --dry-run
+  cfn-ts submit --role-arn arn:aws:iam::123456789:role/MyRole --set-default
 `);
 }
 
@@ -379,6 +576,13 @@ interface ParsedArgs {
     typeName?: string;
     help: boolean;
     version: boolean;
+    // Submit flags
+    setDefault?: boolean;
+    roleArn?: string;
+    noRole?: boolean;
+    region: string;
+    dryRun?: boolean;
+    useDocker?: boolean;
 }
 
 function parseArgs(argv: string[]): ParsedArgs {
@@ -387,6 +591,7 @@ function parseArgs(argv: string[]): ParsedArgs {
         output: process.cwd(),
         help: false,
         version: false,
+        region: process.env.AWS_REGION ?? process.env.AWS_DEFAULT_REGION ?? 'us-east-1',
     };
 
     for (let i = 0; i < args.length; i++) {
@@ -401,6 +606,18 @@ function parseArgs(argv: string[]): ParsedArgs {
             result.output = path.resolve(args[++i]);
         } else if (arg === '--type-name') {
             result.typeName = args[++i];
+        } else if (arg === '--set-default') {
+            result.setDefault = true;
+        } else if (arg === '--role-arn') {
+            result.roleArn = args[++i];
+        } else if (arg === '--no-role') {
+            result.noRole = true;
+        } else if (arg === '--region') {
+            result.region = args[++i];
+        } else if (arg === '--dry-run') {
+            result.dryRun = true;
+        } else if (arg === '--use-docker') {
+            result.useDocker = true;
         } else if (!arg.startsWith('-') && !result.command) {
             result.command = arg;
         }
@@ -413,7 +630,7 @@ function parseArgs(argv: string[]): ParsedArgs {
 // Entry point
 // ---------------------------------------------------------------------------
 
-function main(): void {
+async function main(): Promise<void> {
     const args = parseArgs(process.argv);
 
     if (args.version) {
@@ -426,31 +643,42 @@ function main(): void {
         process.exit(0);
     }
 
-    try {
-        switch (args.command) {
-            case 'generate':
-                cmdGenerate({ schema: args.schema, output: args.output });
-                break;
+    switch (args.command) {
+        case 'generate':
+            cmdGenerate({ schema: args.schema, output: args.output });
+            break;
 
-            case 'init':
-                if (!args.typeName) {
-                    err(
-                        '--type-name is required for init. Example: --type-name My::Svc::Resource'
-                    );
-                    process.exit(1);
-                }
-                cmdInit({ typeName: args.typeName, output: args.output });
-                break;
-
-            default:
-                err(`Unknown command: ${args.command}`);
-                printHelp();
+        case 'init':
+            if (!args.typeName) {
+                err(
+                    '--type-name is required for init. Example: --type-name My::Svc::Resource'
+                );
                 process.exit(1);
-        }
-    } catch (e) {
-        err(e instanceof Error ? e.message : String(e));
-        process.exit(1);
+            }
+            cmdInit({ typeName: args.typeName, output: args.output });
+            break;
+
+        case 'submit':
+            await cmdSubmit({
+                schema: args.schema,
+                output: args.output,
+                setDefault: args.setDefault,
+                roleArn: args.roleArn,
+                noRole: args.noRole,
+                region: args.region,
+                dryRun: args.dryRun,
+                useDocker: args.useDocker,
+            });
+            break;
+
+        default:
+            err(`Unknown command: ${args.command}`);
+            printHelp();
+            process.exit(1);
     }
 }
 
-main();
+main().catch((e) => {
+    err(e instanceof Error ? e.message : String(e));
+    process.exit(1);
+});

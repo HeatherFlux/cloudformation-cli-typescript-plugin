@@ -7,6 +7,7 @@ export * from './resource';
 export * from './recast';
 export * from './utils';
 export * as codegen from './codegen';
+export * as submit from './submit';
 
 // DO NOT DELETE - used by CI to confirm package is wired up correctly
 export { healthCheck } from './health-check';
