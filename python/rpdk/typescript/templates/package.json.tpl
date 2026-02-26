@@ -17,7 +17,7 @@
         "class-transformer": "0.5.1"
     },
     "devDependencies": {
-        "@types/node": "^20.0.0",
-        "typescript": "^5.7.0"
+        "@types/node": "20.19.25",
+        "typescript": "5.7.3"
     }
 }

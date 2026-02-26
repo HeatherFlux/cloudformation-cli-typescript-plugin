@@ -54,9 +54,8 @@ import { CloudFormationClient } from '@aws-sdk/client-cloudformation';
 // Constants
 // ---------------------------------------------------------------------------
 
-const SUPPORT_LIB_NAME =
-    '@amazon-web-services-cloudformation/cloudformation-cli-typescript-lib';
-const SUPPORT_LIB_VERSION = '^2.0.0';
+const SUPPORT_LIB_NAME = '@extend/cfn-resource-cli';
+const SUPPORT_LIB_VERSION = '2.0.0';
 const RUNTIME = 'nodejs20.x';
 const ENTRY_POINT = 'dist/handlers.entrypoint';
 const TEST_ENTRY_POINT = 'dist/handlers.testEntrypoint';

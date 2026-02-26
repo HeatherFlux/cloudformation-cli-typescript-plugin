@@ -33,6 +33,7 @@
         "lint": "eslint --ext .ts,.js .",
         "lint:fix": "eslint --fix --ext .ts,.js .",
         "test": "jest",
+        "test:unit:ci": "jest",
         "test:debug": "node --inspect ./node_modules/.bin/jest --runInBand",
         "test:coverage": "jest --coverage",
         "typecheck": "tsc --noEmit",

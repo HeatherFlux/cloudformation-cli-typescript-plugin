@@ -1,6 +1,6 @@
 # CloudFormation CLI TypeScript Plugin
 
-[![NPM version](https://img.shields.io/npm/v/@amazon-web-services-cloudformation/cloudformation-cli-typescript-lib)](https://www.npmjs.com/package/@amazon-web-services-cloudformation/cloudformation-cli-typescript-lib)
+[![NPM version](https://img.shields.io/npm/v/@extend/cfn-resource-cli)](https://www.npmjs.com/package/@extend/cfn-resource-cli)
 [![Node.js version](https://img.shields.io/badge/node-%3E%3D20-brightgreen)](https://nodejs.org/)
 [![License](https://img.shields.io/badge/license-Apache%202.0-blue)](LICENSE)
 
@@ -10,7 +10,7 @@ This package ships two things in one:
 
 | Component | Description |
 |-----------|-------------|
-| **Runtime library** | `@amazon-web-services-cloudformation/cloudformation-cli-typescript-lib` — the npm package your Lambda handler depends on at runtime |
+| **Runtime library** | `@extend/cfn-resource-cli` — the npm package your Lambda handler depends on at runtime |
 | **`cfn-ts` CLI** | Native TypeScript code generator — scaffolds new resource providers and regenerates `src/models.ts` from your schema, **no Python required** |
 
 ---
@@ -18,7 +18,7 @@ This package ships two things in one:
 ## Quick start (native TypeScript, no Python)
 
 ```bash
-npm install -g @amazon-web-services-cloudformation/cloudformation-cli-typescript-lib
+npm install -g @extend/cfn-resource-cli
 ```
 
 ### Scaffold a new resource provider
@@ -50,7 +50,7 @@ Edit `src/handlers.ts`. Each handler follows this pattern:
 ```typescript
 import { Action, BaseResource, handlerEvent, OperationStatus,
          ProgressEvent, ResourceModel, SessionProxy } from './models';
-import type { Dict } from '@amazon-web-services-cloudformation/cloudformation-cli-typescript-lib';
+import type { Dict } from '@extend/cfn-resource-cli';
 
 const resource = new Resource(ResourceModel.TYPE_NAME, ResourceModel, null, null, TypeConfigurationModel);
 export const entrypoint = resource.entrypoint;

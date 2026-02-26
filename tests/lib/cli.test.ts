@@ -161,11 +161,7 @@ describe('cfn-ts init', () => {
             fs.readFileSync(path.join(tmpDir, 'package.json'), 'utf8')
         );
         expect(pkg.name).toBe('org-test-widget');
-        expect(
-            pkg.dependencies[
-                '@amazon-web-services-cloudformation/cloudformation-cli-typescript-lib'
-            ]
-        ).toBeTruthy();
+        expect(pkg.dependencies['@extend/cfn-resource-cli']).toBeTruthy();
         expect(pkg.dependencies['aws-sdk']).toBeUndefined();
     });
 

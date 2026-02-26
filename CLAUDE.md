@@ -6,7 +6,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 This is a **dual-language project** with two distinct components:
 
-1. **TypeScript runtime library** (`src/`) — npm package `@amazon-web-services-cloudformation/cloudformation-cli-typescript-lib` that resource providers depend on at runtime.
+1. **TypeScript runtime library** (`src/`) — npm package `@extend/cfn-resource-cli` that resource providers depend on at runtime.
 2. **Python plugin** (`python/rpdk/typescript/`) — pip package `cloudformation-cli-typescript-plugin` that integrates with the `cfn` CLI to scaffold and build TypeScript resource providers.
 
 ## Commands

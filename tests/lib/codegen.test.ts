@@ -77,8 +77,7 @@ const FULL_SCHEMA: CfnResourceSchema = {
     additionalIdentifiers: [['/properties/Count', '/properties/Price']],
 };
 
-const LIB_NAME =
-    '@amazon-web-services-cloudformation/cloudformation-cli-typescript-lib';
+const LIB_NAME = '@extend/cfn-resource-cli';
 
 // ---------------------------------------------------------------------------
 // resolver
@@ -700,7 +699,7 @@ describe('generatePackageJson', () => {
     beforeAll(() => {
         const source = generatePackageJson({
             libName: LIB_NAME,
-            libVersion: '^2.0.0',
+            libVersion: '2.0.0',
             typeName: 'Org::Service::Resource',
             projectName: 'org-service-resource',
             entrypoint: 'dist/handlers.entrypoint',
@@ -715,7 +714,7 @@ describe('generatePackageJson', () => {
     });
 
     test('lib dependency present with version', () => {
-        expect(pkg.dependencies[LIB_NAME]).toBe('^2.0.0');
+        expect(pkg.dependencies[LIB_NAME]).toBe('2.0.0');
     });
 
     test('class-transformer dependency present', () => {
@@ -774,7 +773,7 @@ describe('generateSamTemplate', () => {
     beforeAll(() => {
         source = generateSamTemplate({
             libName: LIB_NAME,
-            libVersion: '^2.0.0',
+            libVersion: '2.0.0',
             typeName: 'Org::Service::Resource',
             projectName: 'org-service-resource',
             entrypoint: 'dist/handlers.entrypoint',
@@ -861,7 +860,7 @@ describe('generateReadme', () => {
     beforeAll(() => {
         source = generateReadme({
             libName: LIB_NAME,
-            libVersion: '^2.0.0',
+            libVersion: '2.0.0',
             typeName: 'Org::Service::Resource',
             projectName: 'org-service-resource',
             entrypoint: 'dist/handlers.entrypoint',
@@ -898,7 +897,7 @@ describe('generateSamTestCreate', () => {
     beforeAll(() => {
         const source = generateSamTestCreate({
             libName: LIB_NAME,
-            libVersion: '^2.0.0',
+            libVersion: '2.0.0',
             typeName: 'Org::Service::Resource',
             projectName: 'org-service-resource',
             entrypoint: 'dist/handlers.entrypoint',

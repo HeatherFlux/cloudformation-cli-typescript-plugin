@@ -338,7 +338,7 @@ def test_support_lib_version_matches_package_json():
 
     repo_root = Path(__file__).parent.parent.parent
     pkg = json.loads((repo_root / "package.json").read_text())
-    expected = f"^{pkg['version']}"
+    expected = pkg["version"]
 
     # Check the data file directly (it's the source of truth).
     version_file = (
@@ -349,7 +349,7 @@ def test_support_lib_version_matches_package_json():
         / "data"
         / "support-lib-version.txt"
     )
-    file_version = f"^{version_file.read_text().strip()}"
+    file_version = version_file.read_text().strip()
     assert file_version == expected, (
         f"support-lib-version.txt ({file_version!r}) does not match "
         f"package.json version ({pkg['version']!r}). "
@@ -472,7 +472,7 @@ def test__build_validates_prerequisites(plugin: TypescriptLanguagePlugin, tmp_pa
 
 
 def test_load_support_lib_version_oserror_fallback():
-    """_load_support_lib_version falls back to '^2.0.0' when file is unreadable."""
+    """_load_support_lib_version falls back to '2.0.0' when file is unreadable."""
     # pylint: disable-next=import-outside-toplevel
     from rpdk.typescript.codegen import _load_support_lib_version
 
@@ -480,7 +480,7 @@ def test_load_support_lib_version_oserror_fallback():
         with patch("rpdk.typescript.codegen.LOG") as mock_log:
             version = _load_support_lib_version()
 
-    assert version == "^2.0.0"
+    assert version == "2.0.0"
     mock_log.warning.assert_called_once()
 
 

@@ -10,7 +10,7 @@
 
 This is a mature, well-tested dual-language project providing:
 
-1. **TypeScript runtime library** (`src/`) — npm package `@amazon-web-services-cloudformation/cloudformation-cli-typescript-lib` v2.0.0
+1. **TypeScript runtime library** (`src/`) — npm package `@extend/cfn-resource-cli` v2.0.0
 2. **Python plugin** (`python/rpdk/typescript/`) — pip package `cloudformation-cli-typescript-plugin` v1.0.5
 3. **Native TypeScript codegen** (`src/codegen/`) — full TS port of the Python resolver/templates
 4. **CLI tool** (`src/bin/cfn-ts.ts`) — `cfn-ts generate` and `cfn-ts init` commands

@@ -24,7 +24,7 @@
  * const schema: CfnResourceSchema = JSON.parse(schemaJson);
  * const models = resolveModels(schema);
  * const source = generateModels({
- *     libName: '@amazon-web-services-cloudformation/cloudformation-cli-typescript-lib',
+ *     libName: '@extend/cfn-resource-cli',
  *     typeName: schema.typeName,
  *     models,
  *     primaryIdentifier: schema.primaryIdentifier,

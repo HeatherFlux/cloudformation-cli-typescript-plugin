@@ -9,7 +9,7 @@
 export interface ScaffoldOptions {
     /** The support library package name (e.g., `@acme/cfn-lib`). */
     libName: string;
-    /** The support library version constraint (e.g., `^2.0.0`). */
+    /** The support library version (e.g., `2.0.0`). */
     libVersion: string;
     /** The CloudFormation type name, e.g. `"Org::Service::Resource"`. */
     typeName: string;
