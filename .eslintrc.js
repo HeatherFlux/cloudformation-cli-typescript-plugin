@@ -52,6 +52,7 @@ module.exports = {
                 '@typescript-eslint/no-unused-vars': 'off',
                 // no-var-requires is deprecated in @typescript-eslint/eslint-plugin v8+; no-require-imports handles this
                 '@typescript-eslint/no-require-imports': 'off',
+                '@typescript-eslint/no-var-requires': 'off',
             },
         },
         {

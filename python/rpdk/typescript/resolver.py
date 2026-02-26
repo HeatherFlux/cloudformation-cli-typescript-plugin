@@ -72,6 +72,10 @@ def translate_type(resolved_type):
 
 
 def contains_model(resolved_type):
-    if resolved_type.container in (ContainerType.LIST, ContainerType.SET, ContainerType.DICT):
+    if resolved_type.container in (
+        ContainerType.LIST,
+        ContainerType.SET,
+        ContainerType.DICT,
+    ):
         return contains_model(resolved_type.type)
     return resolved_type.container == ContainerType.MODEL

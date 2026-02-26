@@ -4,6 +4,7 @@ import shutil
 import sys
 from subprocess import PIPE, CalledProcessError, run as subprocess_run  # nosec
 from tempfile import TemporaryFile
+from zipfile import ZipFile
 
 from rpdk.core.data_loaders import resource_stream
 from rpdk.core.exceptions import DownstreamError
@@ -13,9 +14,6 @@ from rpdk.core.plugin_base import LanguagePlugin
 
 from .resolver import contains_model, get_inner_type, translate_type
 from .utils import safe_reserved
-
-from zipfile import ZipFile
-
 
 LOG = logging.getLogger(__name__)
 
@@ -47,9 +45,7 @@ def _load_support_lib_version() -> str:
         with open(version_file, "r", encoding="utf-8") as fh:
             return f"^{fh.read().strip()}"
     except OSError:
-        LOG.warning(
-            "Could not read support-lib-version.txt; falling back to '^2.0.0'."
-        )
+        LOG.warning("Could not read support-lib-version.txt; falling back to '^2.0.0'.")
         return "^2.0.0"
 
 
@@ -327,8 +323,10 @@ class TypescriptLanguagePlugin(LanguagePlugin):
             major = int(version_str.split(".")[0])
             if major < 20:
                 raise DownstreamError(
-                    f"Node.js >= 20 is required, but {result.stdout.strip()} was found. "
-                    "Install a newer version from https://nodejs.org/."
+                    "Node.js >= 20 is required, but "
+                    f"{result.stdout.strip()} was found. "
+                    "Install a newer version from "
+                    "https://nodejs.org/."
                 )
         except CalledProcessError as e:
             raise DownstreamError("Failed to determine Node.js version.") from e
@@ -342,9 +340,11 @@ class TypescriptLanguagePlugin(LanguagePlugin):
         if self._build_command is None and not shutil.which("sam"):
             raise DownstreamError(
                 "AWS SAM CLI is not installed or not on PATH. "
-                "Install it from https://docs.aws.amazon.com/serverless-application-model/"
-                "latest/developerguide/install-sam-cli.html, "
-                "or set a custom 'buildCommand' in .rpdk-config to skip SAM."
+                "Install it from https://docs.aws.amazon.com/"
+                "serverless-application-model/latest/"
+                "developerguide/install-sam-cli.html, or set "
+                "a custom 'buildCommand' in .rpdk-config "
+                "to skip SAM."
             )
 
     def _build(self, base_path):
@@ -390,7 +390,7 @@ class TypescriptLanguagePlugin(LanguagePlugin):
                 )
 
         except (FileNotFoundError, CalledProcessError) as e:
-            if hasattr(e, 'stderr') and e.stderr:
+            if hasattr(e, "stderr") and e.stderr:
                 LOG.warning(e.stderr)
             raise DownstreamError("local build failed") from e
 

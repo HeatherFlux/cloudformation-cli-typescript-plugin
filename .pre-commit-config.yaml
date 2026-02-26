@@ -45,21 +45,19 @@ repos:
       - id: python-check-mock-methods
       - id: python-no-log-warn
   - repo: https://github.com/PyCQA/bandit
-    rev: 1.7.1
+    rev: 1.7.9
     hooks:
       - id: bandit
         files: "^python/"
-  - repo: https://github.com/pre-commit/mirrors-eslint
-    rev: v8.26.0
-    hooks:
-      - id: eslint
-        args: [--fix]
-        types: []
-        files: (.*.js$|.*.ts$)
-        additional_dependencies:
-          - eslint@8.21.0
   - repo: local
     hooks:
+      - id: eslint-local
+        name: eslint-local
+        description: Run eslint in the local environment
+        entry: pnpm eslint --fix .
+        language: system
+        pass_filenames: false
+        always_run: true
       - id: pylint-local
         name: pylint-local
         description: Run pylint in the local virtualenv

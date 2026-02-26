@@ -6,6 +6,7 @@ import sys
 from subprocess import CalledProcessError
 from unittest.mock import patch, sentinel
 from uuid import uuid4
+from zipfile import ZipFile
 
 import pytest
 from rpdk.core.exceptions import DownstreamError
@@ -15,9 +16,6 @@ from rpdk.typescript.codegen import (
     TypescriptLanguagePlugin,
     validate_no,
 )
-
-from zipfile import ZipFile
-
 
 TYPE_NAME = "foo::bar::baz"
 
@@ -280,8 +278,9 @@ def test__build_docker(plugin: TypescriptLanguagePlugin):
     )
     # Bypass prerequisite checks — tested separately in test_validate_prerequisites_*
     patch_validate = patch.object(plugin, "_validate_build_prerequisites")
-    with patch_cmd as mock_cmd, patch_subprocess_run as mock_subprocess_run, patch_validate:
-        plugin._build(sentinel.base_path)
+    with patch_cmd as mock_cmd, patch_subprocess_run as mock_subprocess_run:
+        with patch_validate:
+            plugin._build(sentinel.base_path)
 
     mock_cmd.assert_called_once_with(sentinel.base_path, None)
     if sys.platform == "win32":
@@ -331,8 +330,10 @@ def test_support_lib_version_matches_package_json():
     ``python/rpdk/typescript/data/support-lib-version.txt``.  Updating that
     file is all that is needed when bumping the npm package version.
     """
-    import json
-    from pathlib import Path
+    import json  # pylint: disable=import-outside-toplevel
+    from pathlib import Path  # pylint: disable=import-outside-toplevel
+
+    # pylint: disable-next=import-outside-toplevel
     from rpdk.typescript.codegen import SUPPORT_LIB_VERSION
 
     repo_root = Path(__file__).parent.parent.parent
@@ -341,7 +342,12 @@ def test_support_lib_version_matches_package_json():
 
     # Check the data file directly (it's the source of truth).
     version_file = (
-        repo_root / "python" / "rpdk" / "typescript" / "data" / "support-lib-version.txt"
+        repo_root
+        / "python"
+        / "rpdk"
+        / "typescript"
+        / "data"
+        / "support-lib-version.txt"
     )
     file_version = f"^{version_file.read_text().strip()}"
     assert file_version == expected, (
@@ -390,9 +396,7 @@ def test_validate_prerequisites_node_too_old(plugin: TypescriptLanguagePlugin):
     with patch("rpdk.typescript.codegen.shutil.which", side_effect=which_side_effect):
         with patch(
             "rpdk.typescript.codegen.subprocess_run",
-            return_value=type(
-                "CP", (), {"stdout": "v18.20.0\n", "returncode": 0}
-            )(),
+            return_value=type("CP", (), {"stdout": "v18.20.0\n", "returncode": 0})(),
         ):
             with pytest.raises(DownstreamError, match="Node.js >= 20 is required"):
                 plugin._validate_build_prerequisites()
@@ -410,9 +414,7 @@ def test_validate_prerequisites_sam_missing_default_command(
     with patch("rpdk.typescript.codegen.shutil.which", side_effect=which_side_effect):
         with patch(
             "rpdk.typescript.codegen.subprocess_run",
-            return_value=type(
-                "CP", (), {"stdout": "v20.10.0\n", "returncode": 0}
-            )(),
+            return_value=type("CP", (), {"stdout": "v20.10.0\n", "returncode": 0})(),
         ):
             with pytest.raises(DownstreamError, match="AWS SAM CLI is not installed"):
                 plugin._validate_build_prerequisites()
@@ -430,9 +432,7 @@ def test_validate_prerequisites_sam_not_required_with_custom_command(
     with patch("rpdk.typescript.codegen.shutil.which", side_effect=which_side_effect):
         with patch(
             "rpdk.typescript.codegen.subprocess_run",
-            return_value=type(
-                "CP", (), {"stdout": "v20.10.0\n", "returncode": 0}
-            )(),
+            return_value=type("CP", (), {"stdout": "v20.10.0\n", "returncode": 0})(),
         ):
             # Should not raise — custom buildCommand means sam is optional
             plugin._validate_build_prerequisites()
@@ -442,14 +442,10 @@ def test_validate_prerequisites_all_present(plugin: TypescriptLanguagePlugin):
     """No error raised when all prerequisites are available."""
     plugin._build_command = None
 
-    with patch(
-        "rpdk.typescript.codegen.shutil.which", return_value="/usr/bin/tool"
-    ):
+    with patch("rpdk.typescript.codegen.shutil.which", return_value="/usr/bin/tool"):
         with patch(
             "rpdk.typescript.codegen.subprocess_run",
-            return_value=type(
-                "CP", (), {"stdout": "v20.10.0\n", "returncode": 0}
-            )(),
+            return_value=type("CP", (), {"stdout": "v20.10.0\n", "returncode": 0})(),
         ):
             plugin._validate_build_prerequisites()  # should not raise
 
@@ -477,6 +473,7 @@ def test__build_validates_prerequisites(plugin: TypescriptLanguagePlugin, tmp_pa
 
 def test_load_support_lib_version_oserror_fallback():
     """_load_support_lib_version falls back to '^2.0.0' when file is unreadable."""
+    # pylint: disable-next=import-outside-toplevel
     from rpdk.typescript.codegen import _load_support_lib_version
 
     with patch("builtins.open", side_effect=OSError("no such file")):
@@ -504,10 +501,9 @@ def test_generate_with_configuration_schema(project: Project):
 
 
 def test_recursive_relative_write_skips_directories(tmp_path):
-    """_recursive_relative_write skips directory entries (codegen.py:257->256 branch)."""
-    from zipfile import ZipFile
-    from io import BytesIO
-    from unittest.mock import MagicMock
+    """_recursive_relative_write skips directory entries."""
+    from io import BytesIO  # pylint: disable=import-outside-toplevel
+    from zipfile import ZipFile  # pylint: disable=import-outside-toplevel,reimported
 
     # Create a source tree: src_path/subdir/ and src_path/file.txt
     src_path = tmp_path / "src"
@@ -546,7 +542,9 @@ def test_validate_prerequisites_node_called_process_error(
             "rpdk.typescript.codegen.subprocess_run",
             side_effect=CalledProcessError(1, "node"),
         ):
-            with pytest.raises(DownstreamError, match="Failed to determine Node.js version"):
+            with pytest.raises(
+                DownstreamError, match="Failed to determine Node.js version"
+            ):
                 plugin._validate_build_prerequisites()
 
 
@@ -561,7 +559,9 @@ def test_validate_prerequisites_node_version_unparseable(
     with patch("rpdk.typescript.codegen.shutil.which", side_effect=which_side_effect):
         with patch(
             "rpdk.typescript.codegen.subprocess_run",
-            return_value=type("CP", (), {"stdout": "not-a-version\n", "returncode": 0})(),
+            return_value=type(
+                "CP", (), {"stdout": "not-a-version\n", "returncode": 0}
+            )(),
         ):
             with patch("rpdk.typescript.codegen.LOG") as mock_log:
                 plugin._validate_build_prerequisites()  # should not raise

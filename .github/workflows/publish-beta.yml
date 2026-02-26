@@ -15,6 +15,6 @@ jobs:
   publish-beta:
     uses: helloextend/gha-reusable-workflows/.github/workflows/publish-beta.yml@v13.28.1
     with:
-      
+
       type: ${{ github.event.inputs.type }}
     secrets: inherit
