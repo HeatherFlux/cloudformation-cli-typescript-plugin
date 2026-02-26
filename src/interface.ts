@@ -1,0 +1,340 @@
+import 'reflect-metadata';
+import {
+    ClassTransformOptions,
+    Exclude,
+    Expose,
+    instanceToPlain,
+    plainToInstance,
+} from 'class-transformer';
+
+// These types were previously imported from aws-sdk v2 CloudFormation client.
+// Defined locally to remove the sdk v2 dependency.
+type ClientRequestToken = string;
+type LogGroupName = string;
+type LogicalResourceId = string;
+
+/** Pagination token returned by list operations. */
+export type NextToken = string;
+
+export type Optional<T> = T | undefined | null;
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+export type Dict<T = any> = Record<string, T>;
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+export type Constructor<T = object> = new (...args: any[]) => T;
+export type integer = bigint;
+
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+export interface Callable<R extends Array<any>, T> {
+    (...args: R): T;
+}
+
+// @ts-expect-error TypeScript does not allow interfaces to extend primitive BigInt
+interface Integer extends bigint {
+    /**
+     * Defines the default JSON representation of
+     * Integer (BigInt) to be a number.
+     */
+    toJSON(): number;
+
+    /** Returns the primitive value of the specified object. */
+    valueOf(): integer;
+
+    readonly [Symbol.toStringTag]: 'Integer';
+}
+
+// @ts-expect-error TypeScript does not allow interfaces to extend BigIntConstructor
+interface IntegerConstructor extends BigIntConstructor {
+    (value?: bigint | integer | boolean | number | string): bigint;
+    readonly prototype: Integer;
+    /**
+     * Returns true if the value passed is a safe integer
+     * to be parsed as number.
+     * @param value An integer value.
+     */
+    isSafeInteger(value: integer): boolean;
+}
+
+/**
+ * Wrapper with additional JSON serialization for bigint type
+ */
+// @ts-expect-error new Proxy(BigInt, handler) is not assignable to IntegerConstructor
+export const Integer: IntegerConstructor = new Proxy(BigInt, {
+    // @ts-expect-error Proxy apply trap signature does not match IntegerConstructor exactly
+    apply(
+        target: IntegerConstructor,
+        _thisArg: unknown,
+        argArray?: unknown[]
+    ): integer {
+        target.prototype.toJSON = function (): number {
+            return Number(this.valueOf());
+        };
+        const isSafeInteger = (value: bigint): boolean => {
+            if (
+                value &&
+                (value < BigInt(Number.MIN_SAFE_INTEGER) ||
+                    value > BigInt(Number.MAX_SAFE_INTEGER))
+            ) {
+                return false;
+            }
+            return true;
+        };
+        target.isSafeInteger = isSafeInteger;
+        // @ts-expect-error argArray is unknown
+        const value = target(...argArray);
+        if (value && !isSafeInteger(value)) {
+            throw new RangeError(`Value is not a safe integer: ${value.toString()}`);
+        }
+        return value;
+    },
+}) as IntegerConstructor;
+
+export enum Action {
+    Create = 'CREATE',
+    Read = 'READ',
+    Update = 'UPDATE',
+    Delete = 'DELETE',
+    List = 'LIST',
+}
+
+export enum StandardUnit {
+    Count = 'Count',
+    Milliseconds = 'Milliseconds',
+}
+
+export enum MetricTypes {
+    HandlerException = 'HandlerException',
+    HandlerInvocationCount = 'HandlerInvocationCount',
+    HandlerInvocationDuration = 'HandlerInvocationDuration',
+}
+
+export enum OperationStatus {
+    Pending = 'PENDING',
+    InProgress = 'IN_PROGRESS',
+    Success = 'SUCCESS',
+    Failed = 'FAILED',
+}
+
+export enum HandlerErrorCode {
+    NotUpdatable = 'NotUpdatable',
+    InvalidRequest = 'InvalidRequest',
+    AccessDenied = 'AccessDenied',
+    InvalidCredentials = 'InvalidCredentials',
+    AlreadyExists = 'AlreadyExists',
+    NotFound = 'NotFound',
+    ResourceConflict = 'ResourceConflict',
+    Throttling = 'Throttling',
+    ServiceLimitExceeded = 'ServiceLimitExceeded',
+    NotStabilized = 'NotStabilized',
+    GeneralServiceException = 'GeneralServiceException',
+    ServiceInternalError = 'ServiceInternalError',
+    NetworkFailure = 'NetworkFailure',
+    InternalFailure = 'InternalFailure',
+    InvalidTypeConfiguration = 'InvalidTypeConfiguration',
+}
+
+export interface Credentials {
+    accessKeyId: string;
+    secretAccessKey: string;
+    sessionToken: string;
+}
+
+/**
+ * Base class for data transfer objects that will contain
+ * serialization and deserialization mechanisms.
+ */
+export abstract class BaseDto {
+    constructor(partial?: unknown) {
+        if (partial === undefined) {
+            return this;
+        }
+        if (partial) {
+            Object.assign(this, partial);
+        }
+    }
+
+    @Exclude()
+    static serializer = {
+        instanceToPlain,
+        plainToInstance,
+    };
+
+    @Exclude()
+    public serialize(removeNull = true): Dict {
+        const data: Dict = JSON.parse(JSON.stringify(instanceToPlain(this)));
+        // To match Java serialization, which drops 'null' values, and the
+        // contract tests currently expect this also.
+        if (removeNull) {
+            for (const key in data) {
+                const value = data[key];
+                if (value == null) {
+                    delete data[key];
+                }
+            }
+        }
+        return data;
+    }
+
+    public static deserialize<T extends BaseDto>(
+        this: new () => T,
+        jsonData: Dict | null | undefined,
+        options: ClassTransformOptions = {}
+    ): T | null {
+        if (jsonData == null) {
+            return null;
+        }
+        return plainToInstance(this, jsonData, {
+            enableImplicitConversion: false,
+            excludeExtraneousValues: true,
+            ...options,
+        });
+    }
+
+    @Exclude()
+    public toJSON(_key?: string): Dict {
+        return this.serialize();
+    }
+}
+
+export interface RequestContext<T> {
+    invocation: number;
+    callbackContext: T;
+    cloudWatchEventsRuleName: string;
+    cloudWatchEventsTargetId: string;
+}
+
+export class BaseModel extends BaseDto {
+    constructor(partial?: unknown) {
+        super();
+        if (partial) {
+            Object.assign(this, partial);
+        }
+    }
+
+    @Exclude()
+    protected static readonly TYPE_NAME?: string;
+
+    @Exclude()
+    public getTypeName(): string {
+        return Object.getPrototypeOf(this).constructor.TYPE_NAME;
+    }
+}
+
+export class TestEvent extends BaseDto {
+    @Expose() credentials: Credentials;
+    @Expose() action: Action;
+    @Expose() request: Dict;
+    @Expose() callbackContext: Dict;
+    @Expose() region?: string;
+}
+
+export class RequestData<T = Dict> extends BaseDto {
+    @Expose() resourceProperties: T;
+    @Expose() providerLogGroupName?: LogGroupName;
+    @Expose() logicalResourceId?: LogicalResourceId;
+    @Expose() systemTags?: Dict<string>;
+    @Expose() stackTags?: Dict<string>;
+    // platform credentials aren't really optional, but this is used to
+    // zero them out to prevent e.g. accidental logging
+    @Expose() callerCredentials?: Credentials;
+    @Expose() providerCredentials?: Credentials;
+    @Expose() previousResourceProperties?: T;
+    @Expose() previousStackTags?: Dict<string>;
+    @Expose() typeConfiguration?: Dict<string>;
+}
+
+export class HandlerRequest<ResourceT = Dict, CallbackT = Dict> extends BaseDto {
+    @Expose() action: Action;
+    @Expose() awsAccountId: string;
+    @Expose() bearerToken: string;
+    @Expose() region: string;
+    @Expose() requestData: RequestData<ResourceT>;
+    @Expose() responseEndpoint?: string;
+    @Expose() stackId?: string;
+    @Expose() resourceType?: string;
+    @Expose() resourceTypeVersion?: string;
+    @Expose() callbackContext?: CallbackT;
+    @Expose() nextToken?: NextToken;
+    @Expose() requestContext?: RequestContext<CallbackT>;
+}
+
+export class BaseResourceHandlerRequest<T extends BaseModel> extends BaseDto {
+    @Expose() clientRequestToken: ClientRequestToken;
+    @Expose() desiredResourceState?: T;
+    @Expose() previousResourceState?: T;
+    @Expose() desiredResourceTags: Dict<string>;
+    @Expose() previousResourceTags: Dict<string>;
+    @Expose() systemTags: Dict<string>;
+    @Expose() awsAccountId: string;
+    @Expose() awsPartition: string;
+    @Expose() logicalResourceIdentifier?: LogicalResourceId;
+    @Expose() nextToken?: NextToken;
+    @Expose() region: string;
+}
+
+export class UnmodeledRequest extends BaseResourceHandlerRequest<BaseModel> {
+    @Exclude()
+    public static fromUnmodeled(obj: Dict): UnmodeledRequest {
+        return UnmodeledRequest.deserialize(obj)!;
+    }
+
+    @Exclude()
+    public static getPartition(region: Optional<string>): Optional<string> {
+        if (!region) {
+            return null;
+        }
+        if (region.startsWith('cn')) {
+            return 'aws-cn';
+        }
+        if (region.startsWith('us-gov')) {
+            return 'aws-gov';
+        }
+        return 'aws';
+    }
+
+    @Exclude()
+    public toModeled<T extends BaseModel = BaseModel>(
+        modelTypeReference: Constructor<T> & {
+            deserialize?: (data: Dict | null | undefined) => T | null;
+        }
+    ): BaseResourceHandlerRequest<T> {
+        const request = BaseResourceHandlerRequest.deserialize<
+            BaseResourceHandlerRequest<T>
+        >({
+            clientRequestToken: this.clientRequestToken,
+            desiredResourceTags: this.desiredResourceTags,
+            previousResourceTags: this.previousResourceTags,
+            systemTags: this.systemTags,
+            awsAccountId: this.awsAccountId,
+            logicalResourceIdentifier: this.logicalResourceIdentifier,
+            nextToken: this.nextToken,
+            region: this.region,
+            awsPartition: UnmodeledRequest.getPartition(this.region),
+        })!;
+        request.desiredResourceState =
+            modelTypeReference.deserialize?.(this.desiredResourceState || {}) ??
+            undefined;
+        request.previousResourceState =
+            modelTypeReference.deserialize?.(this.previousResourceState || {}) ??
+            undefined;
+        return request;
+    }
+}
+
+export interface CfnResponse<T extends BaseModel> {
+    errorCode?: HandlerErrorCode;
+    status: OperationStatus;
+    message: string;
+    resourceModel?: T;
+    resourceModels?: T[];
+    nextToken?: NextToken;
+}
+
+export interface LambdaContext {
+    functionName?: string;
+    functionVersion?: string;
+    invokedFunctionArn?: string;
+    memoryLimitInMB?: number;
+    awsRequestId?: string;
+    callbackWaitsForEmptyEventLoop?: boolean;
+    getRemainingTimeInMillis(): number;
+}

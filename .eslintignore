@@ -1,0 +1,10 @@
+build/
+dist/
+target/
+.idea/
+.vscode/
+node_modules/
+coverage/
+python/
+env/
+.eslintrc.js

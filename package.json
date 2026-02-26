@@ -1,55 +1,91 @@
 {
-  "name": "@extend/package-template",
-  "version": "1.0.0",
-  "description": "Template for packages using pnpm, written in TypeScript",
-  "homepage": "https://github.com/helloextend/package-template#readme",
-  "repository": {
-    "type": "git",
-    "url": "git+https://github.com/helloextend/package-template.git"
-  },
-  "engines": {
-    "node": ">=22.0.0"
-  },
-  "type": "module",
-  "license": "UNLICENSED",
-  "types": "./dist/index.d.mts",
-  "scripts": {
-    "build": "tsdown",
-    "format": "prettier --ignore-path .gitignore --write \"**/*.ts\"",
-    "lint": "oxlint .",
-    "prepare": "husky && pnpm build && publint --strict",
-    "test": "vitest run",
-    "test:coverage": "vitest run --coverage",
-    "test:unit:ci": "pnpm build && vitest run --coverage",
-    "typecheck": "NODE_OPTIONS=--max-old-space-size=15360 tsc --noEmit",
-    "version": "pnpm build"
-  },
-  "lint-staged": {
-    "*.{ts,js}": [
-      "pnpm format",
-      "oxlint --fix",
-      "vitest related --run",
-      "bash -c 'pnpm typecheck'"
-    ]
-  },
-  "devDependencies": {
-    "@types/node": "22.19.1",
-    "@vitest/coverage-v8": "4.0.8",
-    "husky": "9.1.7",
-    "lint-staged": "16.2.7",
-    "oxlint": "1.31.0",
-    "prettier": "3.7.4",
-    "publint": "0.3.16",
-    "tsdown": "0.19.0",
-    "typescript": "5.9.3",
-    "vitest": "4.0.8"
-  },
-  "packageManager": "pnpm@10.23.0",
-  "dependencies": {
-    "@extend/logger": "3.0.7"
-  },
-  "exports": {
-    ".": "./dist/index.mjs",
-    "./package.json": "./package.json"
-  }
+    "name": "@extend/cfn-resource-cli",
+    "version": "2.0.0",
+    "description": "CloudFormation CLI TypeScript Plugin — runtime library and native code generator for CloudFormation resource providers.",
+    "homepage": "https://github.com/helloextend/extend-cfn-resource-cli#readme",
+    "repository": {
+        "type": "git",
+        "url": "git+https://github.com/helloextend/extend-cfn-resource-cli.git"
+    },
+    "author": "Extend",
+    "license": "Apache-2.0",
+    "private": false,
+    "main": "dist/index.js",
+    "types": "./dist/index.d.ts",
+    "bin": {
+        "cfn-ts": "dist/bin/cfn-ts.js"
+    },
+    "files": [
+        "dist"
+    ],
+    "exports": {
+        ".": "./dist/index.js",
+        "./package.json": "./package.json"
+    },
+    "engines": {
+        "node": ">=20.0.0",
+        "npm": ">=10.0.0"
+    },
+    "packageManager": "pnpm@10.23.0",
+    "scripts": {
+        "build": "npx tsc",
+        "prepack": "npm run build",
+        "format": "prettier --ignore-path .gitignore --write \"**/*.ts\"",
+        "lint": "npx eslint --ext .ts,.js .",
+        "lint:fix": "npx eslint --fix --ext .ts,.js .",
+        "test": "npx jest",
+        "test:debug": "npx --node-arg=--inspect jest --runInBand",
+        "test:coverage": "npx jest --coverage",
+        "typecheck": "tsc --noEmit",
+        "prepare": "husky",
+        "version": "pnpm build"
+    },
+    "lint-staged": {
+        "*.{ts,js}": [
+            "pnpm format",
+            "pnpm lint:fix"
+        ]
+    },
+    "dependencies": {
+        "@aws-sdk/client-cloudwatch": "^3.730.0",
+        "@aws-sdk/client-cloudwatch-logs": "^3.943.0",
+        "@aws-sdk/client-s3": "^3.943.0",
+        "@org-formation/tombok": "^0.0.1",
+        "@smithy/types": "^4.12.0",
+        "autobind-decorator": "^2.4.0",
+        "class-transformer": "^0.5.1",
+        "reflect-metadata": "^0.2.2",
+        "uuid": "^9.0.0"
+    },
+    "devDependencies": {
+        "@tsconfig/node20": "^20.1.0",
+        "@types/jest": "^29.5.0",
+        "@types/node": "^20.12.0",
+        "@types/uuid": "^9.0.0",
+        "@typescript-eslint/eslint-plugin": "^6.0.0",
+        "@typescript-eslint/parser": "^6.0.0",
+        "eslint": "~8.21.0",
+        "eslint-config-prettier": "^9.1.0",
+        "eslint-import-resolver-node": "^0.3.3",
+        "eslint-import-resolver-typescript": "^3.6.0",
+        "eslint-plugin-import": "^2.29.0",
+        "eslint-plugin-prefer-arrow": "^1.2.2",
+        "eslint-plugin-prettier": "^5.1.0",
+        "husky": "^9.1.7",
+        "jest": "^29.7.0",
+        "jest-circus": "^29.7.0",
+        "lint-staged": "^16.2.7",
+        "prettier": "^3.1.0",
+        "ts-jest": "^29.1.2",
+        "ts-node": "^10.9.2",
+        "typescript": "~5.7.0"
+    },
+    "prettier": {
+        "parser": "typescript",
+        "singleQuote": true,
+        "tabWidth": 4,
+        "printWidth": 88,
+        "trailingComma": "es5",
+        "endOfLine": "lf"
+    }
 }
