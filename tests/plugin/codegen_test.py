@@ -42,7 +42,7 @@ def project(tmp_path: str):
     with patch_plugins, patch_wizard:
         current_path = os.path.abspath(__file__)
         lib_abspath = os.path.abspath(os.path.join(current_path, "..", "..", ".."))
-        TypescriptLanguagePlugin.SUPPORT_LIB_URI = f"file:{lib_abspath}"
+        TypescriptLanguagePlugin.SUPPORT_LIB_URI = "file:" + lib_abspath
         project.init(TYPE_NAME, TypescriptLanguagePlugin.NAME)
     return project
 
@@ -59,7 +59,7 @@ def project_use_docker(tmp_path: str):
     with patch_plugins:
         current_path = os.path.abspath(__file__)
         lib_abspath = os.path.abspath(os.path.join(current_path, "..", "..", ".."))
-        TypescriptLanguagePlugin.SUPPORT_LIB_URI = f"file:{lib_abspath}"
+        TypescriptLanguagePlugin.SUPPORT_LIB_URI = "file:" + lib_abspath
         project_use_docker.init(
             TYPE_NAME,
             TypescriptLanguagePlugin.NAME,
@@ -80,7 +80,7 @@ def project_no_docker(tmp_path: str):
     with patch_plugins:
         current_path = os.path.abspath(__file__)
         lib_abspath = os.path.abspath(os.path.join(current_path, "..", "..", ".."))
-        TypescriptLanguagePlugin.SUPPORT_LIB_URI = f"file:{lib_abspath}"
+        TypescriptLanguagePlugin.SUPPORT_LIB_URI = "file:" + lib_abspath
         project_no_docker.init(
             TYPE_NAME,
             TypescriptLanguagePlugin.NAME,
@@ -101,7 +101,7 @@ def project_both_true(tmp_path: str):
     with patch_plugins:
         current_path = os.path.abspath(__file__)
         lib_abspath = os.path.abspath(os.path.join(current_path, "..", "..", ".."))
-        TypescriptLanguagePlugin.SUPPORT_LIB_URI = f"file:{lib_abspath}"
+        TypescriptLanguagePlugin.SUPPORT_LIB_URI = "file:" + lib_abspath
         project_both_true.init(
             TYPE_NAME,
             TypescriptLanguagePlugin.NAME,

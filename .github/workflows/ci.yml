@@ -54,7 +54,7 @@ jobs:
         run: |
           mkdir "$LOG_PATH"
           pip install --upgrade pip
-          pip install --upgrade setuptools wheel aws-sam-cli -r https://raw.githubusercontent.com/aws-cloudformation/cloudformation-cli/master/requirements.txt
+          pip install --upgrade "setuptools<78" wheel aws-sam-cli -r https://raw.githubusercontent.com/aws-cloudformation/cloudformation-cli/master/requirements.txt
           pip install .
       - uses: pnpm/action-setup@v4
       - uses: actions/setup-node@v4
