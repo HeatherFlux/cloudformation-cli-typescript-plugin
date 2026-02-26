@@ -133,7 +133,36 @@ Resources:
 /** Generate the `Makefile` for a new resource provider project. */
 export function generateMakefile(): string {
     // Note: Makefile targets must use a real tab character for indentation.
-    return 'build-TypeFunction:\n\tnpx npm ci\n\tnpx npm run build\n';
+    // SAM sets $(ARTIFACTS_DIR) to the build output path.
+    // The Makefile must install deps, compile, and copy artifacts there.
+    return [
+        'build-TypeFunction:',
+        '\t@if [ -f pnpm-lock.yaml ]; then pnpm install --frozen-lockfile; \\',
+        '\telif [ -f yarn.lock ]; then yarn install --frozen-lockfile; \\',
+        '\telif [ -f package-lock.json ]; then npm ci; \\',
+        '\telse npm install; fi',
+        '\tnpm run build',
+        '\tcp -r dist $(ARTIFACTS_DIR)/',
+        '\tcp -r node_modules $(ARTIFACTS_DIR)/',
+        '\tcp package.json $(ARTIFACTS_DIR)/',
+        '',
+    ].join('\n');
+}
+
+// ---------------------------------------------------------------------------
+// .samignore
+// ---------------------------------------------------------------------------
+
+/** Generate the `.samignore` for SAM CLI to exclude from CopySource. */
+export function generateSamIgnore(): string {
+    return `# Exclude large / unnecessary directories from SAM build CopySource
+node_modules/
+build/
+dist/
+coverage/
+.aws-sam/
+*.tgz
+`;
 }
 
 // ---------------------------------------------------------------------------

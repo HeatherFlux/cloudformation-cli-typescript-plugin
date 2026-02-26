@@ -76,6 +76,7 @@ export {
     generateNpmrc,
     generatePackageJson,
     generateReadme,
+    generateSamIgnore,
     generateSamTemplate,
     generateSamTestCreate,
     generateTsConfig,

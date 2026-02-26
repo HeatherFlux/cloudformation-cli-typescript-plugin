@@ -24,6 +24,7 @@ import {
     generateNpmrc,
     generatePackageJson,
     generateReadme,
+    generateSamIgnore,
     generateSamTemplate,
     generateSamTestCreate,
     generateTsConfig,
@@ -285,6 +286,7 @@ function cmdInit(opts: { typeName: string; output: string }): void {
     // Scaffold files (safe — won't overwrite existing)
     safeWrite(path.join(output, '.gitignore'), generateGitignore());
     safeWrite(path.join(output, '.npmrc'), generateNpmrc());
+    safeWrite(path.join(output, '.samignore'), generateSamIgnore());
     safeWrite(path.join(output, 'package.json'), generatePackageJson(scaffoldOpts));
     safeWrite(path.join(output, 'tsconfig.json'), generateTsConfig());
     safeWrite(path.join(output, 'template.yml'), generateSamTemplate(scaffoldOpts));

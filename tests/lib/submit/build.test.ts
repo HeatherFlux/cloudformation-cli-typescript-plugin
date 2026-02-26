@@ -41,9 +41,16 @@ describe('build utilities', () => {
             );
         });
 
-        it('defaults to npm', () => {
-            mockExistsSync.mockReturnValue(false);
+        it('detects npm ci from package-lock.json', () => {
+            mockExistsSync.mockImplementation((p: string) =>
+                String(p).includes('package-lock.json')
+            );
             expect(detectInstallCommand('/proj')).toBe('npm ci --include=optional');
+        });
+
+        it('falls back to npm install when no lockfile exists', () => {
+            mockExistsSync.mockReturnValue(false);
+            expect(detectInstallCommand('/proj')).toBe('npm install');
         });
     });
 
@@ -98,7 +105,7 @@ describe('build utilities', () => {
             mockRmSync.mockReset();
         });
 
-        it('runs install and sam build', () => {
+        it('validates prerequisites and runs sam build', () => {
             mockExecSync.mockImplementation((cmd: string) => {
                 if (cmd === 'node --version') return 'v20.10.0';
                 if (cmd.includes('sam --version')) return 'SAM CLI, version 1.100.0';
@@ -108,9 +115,9 @@ describe('build utilities', () => {
 
             buildProject({ projectDir: '/proj' });
 
-            // install + validate(node) + validate(sam) + sam build
-            expect(mockExecSync).toHaveBeenCalledTimes(4);
-            const samCall = mockExecSync.mock.calls[3][0];
+            // validate(node) + validate(sam) + sam build
+            expect(mockExecSync).toHaveBeenCalledTimes(3);
+            const samCall = mockExecSync.mock.calls[2][0];
             expect(samCall).toContain('sam build');
             expect(samCall).not.toContain('--use-container');
         });
@@ -125,7 +132,7 @@ describe('build utilities', () => {
 
             buildProject({ projectDir: '/proj', useDocker: true });
 
-            const samCall = mockExecSync.mock.calls[3][0];
+            const samCall = mockExecSync.mock.calls[2][0];
             expect(samCall).toContain('--use-container');
         });
 

@@ -26,7 +26,11 @@ export function detectInstallCommand(projectDir: string): string {
     if (fs.existsSync(path.join(projectDir, 'yarn.lock'))) {
         return 'yarn install --frozen-lockfile';
     }
-    return 'npm ci --include=optional';
+    if (fs.existsSync(path.join(projectDir, 'package-lock.json'))) {
+        return 'npm ci --include=optional';
+    }
+    // No lockfile — fall back to npm install (creates one)
+    return 'npm install';
 }
 
 /**
@@ -61,20 +65,16 @@ export function validatePrerequisites(): void {
 }
 
 /**
- * Run the full build pipeline: install deps + SAM build.
+ * Run the full build pipeline: SAM build (which triggers the Makefile).
+ *
+ * The project's Makefile handles dependency installation and compilation
+ * inside SAM's temporary build directory. We only need to validate
+ * prerequisites and invoke SAM.
  */
 export function buildProject(options: BuildOptions): void {
     const { projectDir, useDocker } = options;
 
     validatePrerequisites();
-
-    // Install dependencies
-    const installCmd = detectInstallCommand(projectDir);
-    execSync(installCmd, {
-        cwd: projectDir,
-        stdio: 'pipe',
-        encoding: 'utf8',
-    });
 
     // Remove previous build artifacts
     const buildDir = path.join(projectDir, 'build');
@@ -82,11 +82,10 @@ export function buildProject(options: BuildOptions): void {
         fs.rmSync(buildDir, { recursive: true, force: true });
     }
 
-    // SAM build
+    // SAM build — the Makefile handles npm install + tsc
     const samArgs = [
         'sam',
         'build',
-        '--debug',
         '--build-dir',
         path.join(projectDir, 'build'),
         'TypeFunction',
@@ -97,7 +96,6 @@ export function buildProject(options: BuildOptions): void {
 
     execSync(samArgs.join(' '), {
         cwd: projectDir,
-        stdio: 'pipe',
-        encoding: 'utf8',
+        stdio: 'inherit',
     });
 }

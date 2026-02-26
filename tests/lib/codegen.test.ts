@@ -814,10 +814,17 @@ describe('generateMakefile', () => {
         expect(source).toContain('build-TypeFunction:');
     });
 
+    test('detects package manager from lockfile', () => {
+        const source = generateMakefile();
+        expect(source).toContain('pnpm-lock.yaml');
+        expect(source).toContain('yarn.lock');
+        expect(source).toContain('package-lock.json');
+        expect(source).toContain('npm install');
+    });
+
     test('uses tab indentation for commands', () => {
         const source = generateMakefile();
-        expect(source).toContain('\tnpx npm ci');
-        expect(source).toContain('\tnpx npm run build');
+        expect(source).toContain('\tnpm run build');
     });
 });
 
