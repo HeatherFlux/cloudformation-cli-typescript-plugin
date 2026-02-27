@@ -357,6 +357,14 @@ class TypescriptLanguagePlugin(LanguagePlugin):
         # TODO: We should use the build logic from SAM CLI library, instead:
         # https://github.com/awslabs/aws-sam-cli/blob/master/samcli/lib/build/app_builder.py
         command = self._make_build_command(base_path, self._build_command)
+        if self._build_command is not None:
+            # Security note: custom buildCommand from .rpdk-config is passed
+            # to a shell.  The project owner controls this file, but log the
+            # command so that unexpected invocations are traceable.
+            LOG.warning(
+                "Using custom buildCommand from .rpdk-config: %s",
+                self._build_command,
+            )
         if self._use_docker:
             command = command + " --use-container"
         command = command + " " + MAIN_HANDLER_FUNCTION

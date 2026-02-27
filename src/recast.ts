@@ -36,7 +36,14 @@ export const recastPrimitive = (
         }
         throw new InvalidRequest(`Value for ${k} "${v}" is not boolean`);
     }
-    // cls is always a non-null-returning constructor (Boolean/Number/BigInt/Integer/String) at this point
+    if (Object.is(cls, Number)) {
+        const parsed = Number(v);
+        if (Number.isNaN(parsed)) {
+            throw new InvalidRequest(`Value for ${k} "${v}" is not number`);
+        }
+        return parsed;
+    }
+    // cls is always a non-null-returning constructor (BigInt/Integer/String) at this point
     return (cls(v) as NonNullable<primitive>).valueOf() as primitive;
 };
 

@@ -53,7 +53,7 @@ describe('when getting resource', () => {
     beforeEach(() => {
         entrypointPayload = {
             awsAccountId: '123456789012',
-            bearerToken: 'e722ae60-fe62-11e8-9a0e-0ae8cc519968',
+            bearerToken: 'test-bearer-token',
             region: 'us-east-1',
             action: 'CREATE',
             responseEndpoint: null,
